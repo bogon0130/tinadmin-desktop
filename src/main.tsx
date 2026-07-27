@@ -3,14 +3,14 @@ import { createRoot } from "react-dom/client"
 
 import "./index.css"
 import App from "./App.tsx"
-import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { ExternalLinkGuard } from "./components/external-link-guard.tsx"
+
+// 항상 다크 테마 (index.css에서 :root/.dark 를 같은 팔레트로 고정)
+document.documentElement.classList.add("dark")
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider>
-      <ExternalLinkGuard />
-      <main data-ui-scroll-container><App /></main>
-    </ThemeProvider>
-  </StrictMode>
+    <ExternalLinkGuard />
+    <App />
+  </StrictMode>,
 )

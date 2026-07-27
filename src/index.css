@@ -175,3 +175,53 @@ body {
     @apply select-text;
   }
 }
+
+/* ==========================================================================
+   tinadmin 터미널 테마 — 항상 다크 + 초록 포인트 (라이트 모드 비활성)
+   ========================================================================== */
+:root,
+.dark {
+    --background: oklch(0.16 0.008 155);
+    --foreground: oklch(0.92 0.012 150);
+    --card: oklch(0.20 0.010 155);
+    --card-foreground: oklch(0.92 0.012 150);
+    --popover: oklch(0.20 0.010 155);
+    --popover-foreground: oklch(0.92 0.012 150);
+    --primary: oklch(0.76 0.19 150);
+    --primary-foreground: oklch(0.16 0.02 155);
+    --secondary: oklch(0.26 0.012 155);
+    --secondary-foreground: oklch(0.92 0.012 150);
+    --muted: oklch(0.24 0.010 155);
+    --muted-foreground: oklch(0.66 0.018 150);
+    --accent: oklch(0.30 0.030 152);
+    --accent-foreground: oklch(0.92 0.03 150);
+    --destructive: oklch(0.58 0.21 25);
+    --destructive-foreground: oklch(0.98 0 0);
+    --border: oklch(0.30 0.014 155);
+    --input: oklch(0.28 0.014 155);
+    --ring: oklch(0.76 0.19 150);
+    --sidebar: oklch(0.13 0.010 155);
+    --sidebar-foreground: oklch(0.88 0.012 150);
+    --sidebar-primary: oklch(0.76 0.19 150);
+    --sidebar-primary-foreground: oklch(0.14 0.02 155);
+    --sidebar-accent: oklch(0.24 0.020 152);
+    --sidebar-accent-foreground: oklch(0.92 0.03 150);
+    --sidebar-border: oklch(0.26 0.014 155);
+    --sidebar-ring: oklch(0.76 0.19 150);
+    --radius: 0.5rem;
+}
+
+/* 터미널 느낌 모노스페이스 */
+.font-mono-tin {
+    font-family: "D2Coding", "Cascadia Mono", "Consolas", ui-monospace,
+        SFMono-Regular, Menlo, monospace;
+    font-variant-ligatures: none;
+}
+
+/* 표 스크롤 영역 */
+.tin-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.tin-scroll::-webkit-scrollbar-track { background: transparent; }
+.tin-scroll::-webkit-scrollbar-thumb {
+    background: oklch(0.34 0.02 155); border-radius: 5px;
+}
+.tin-scroll::-webkit-scrollbar-thumb:hover { background: oklch(0.44 0.05 152); }
