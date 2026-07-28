@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react"
 import {
   AlarmClock,
+  BarChart3,
   BookText,
   Boxes,
   EyeOff,
@@ -39,10 +40,11 @@ import { Cheatsheet } from "@/components/cheatsheet"
 import { RawView } from "@/components/raw-view"
 import { PresetsView } from "@/components/presets-view"
 import { NotesView } from "@/components/notes-view"
+import { StatsView } from "@/components/stats-view"
 
 const FILES = ["한비광.tin", "공용.tin"]
 
-type ViewId = TableType | "presets" | "notes" | "raw"
+type ViewId = TableType | "presets" | "notes" | "raw" | "stats"
 
 const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "action", label: "자반", icon: Zap },
@@ -56,6 +58,7 @@ const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "class", label: "클래스", icon: Boxes },
   { id: "presets", label: "캐릭터 프리셋", icon: Boxes },
   { id: "notes", label: "정보 저장소", icon: BookText },
+  { id: "stats", label: "통계", icon: BarChart3 },
   { id: "raw", label: "Raw 편집", icon: FileCode2 },
 ]
 
@@ -165,7 +168,7 @@ export default function App() {
     )
   }
 
-  const usesFile = view !== "presets" && view !== "notes"
+  const usesFile = view !== "presets" && view !== "notes" && view !== "stats"
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -322,6 +325,7 @@ export default function App() {
             <PresetsView currentFile={file} entries={entries} />
           )}
           {view === "notes" && <NotesView />}
+          {view === "stats" && <StatsView />}
         </div>
       </div>
 

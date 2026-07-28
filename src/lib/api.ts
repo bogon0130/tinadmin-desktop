@@ -143,3 +143,64 @@ export async function saveNotes(content: string): Promise<void> {
     body: JSON.stringify({ content }),
   })
 }
+
+// ---- 레벨업 통계 ----
+export interface CharStats {
+  name: string
+  count: number
+  latest_level: number
+  first_at: string
+  last_at: string
+  gap_avg_min: number | null
+  gap_min_min: number | null
+  gap_max_min: number | null
+  per_hour: number | null
+  today_count: number
+  totals: { hp: number; mp: number; mv: number; tr: number }
+  avg_per_level: { hp: number; mp: number; mv: number; tr: number }
+  daily: { date: string; count: number; hp: number; mp: number; mv: number; tr: number }[]
+  hourly: number[]
+}
+
+export interface StatsMe {
+  from: string
+  to: string
+  total: number
+  characters: CharStats[]
+}
+
+export interface OtherPerson {
+  name: string
+  count: number
+  first_at: string
+  last_at: string
+  gap_avg_min: number | null
+  stats_available: boolean
+}
+
+export interface StatsOthers {
+  from: string
+  to: string
+  total: number
+  people: OtherPerson[]
+  note: string
+}
+
+function rangeQuery(from?: string, to?: string) {
+  const q = new URLSearchParams()
+  if (from) q.set("from", from)
+  if (to) q.set("to", to)
+  const s = q.toString()
+  return s ? `?${s}` : ""
+}
+
+export async function getStatsMe(from?: string, to?: string): Promise<StatsMe> {
+  return request<StatsMe>(`/api/stats/me${rangeQuery(from, to)}`)
+}
+
+export async function getStatsOthers(
+  from?: string,
+  to?: string,
+): Promise<StatsOthers> {
+  return request<StatsOthers>(`/api/stats/others${rangeQuery(from, to)}`)
+}
