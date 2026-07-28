@@ -63,8 +63,18 @@ jobs:
         id: prebuild
         shell: bash
         continue-on-error: true
+        env:
+          # 서명이 켜져 있으면 이 단계도 서명을 하므로 동일한 키를 넘겨야 한다.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           set -o pipefail
+          # 서명키가 실제로 넘어왔는지 값 노출 없이 확인 (원인 파악용)
+          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY 가 비어 있음 (Secret 미등록/이름 오타 의심)"
+          else
+            echo "서명키 길이: ${#TAURI_SIGNING_PRIVATE_KEY} 자"
+          fi
           bun run tauri build ${{ matrix.args }} 2>&1 | tee build.log
 
       - name: 빌드 실패 시 에러 내용을 annotation 으로 출력
@@ -82,10 +92,9 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # [v0.4.1 임시] 서명 원인 격리를 위해 잠시 비활성화.
-          # createUpdaterArtifacts 를 다시 true 로 켤 때 아래 2줄도 같이 되살린다.
-          # TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          # TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # 자동 업데이트 서명키 (GitHub Secrets에 등록되어 있어야 함)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: v__VERSION__
@@ -96,9 +105,8 @@ jobs:
           retryAttempts: 2
           args: ${{ matrix.args }}
           assetNamePattern: "[name]-[version]-[platform]-[arch][ext]"
-          # [v0.4.1 임시] 서명을 껐으므로 latest.json 도 만들지 않는다.
-          # 서명 문제 해결되면 true 로 되돌린다.
-          includeUpdaterJson: false
+          # latest.json (업데이트 정보 파일) 을 Releases에 같이 올린다 → 앱이 이걸 보고 새 버전 확인
+          includeUpdaterJson: true
 
       - name: Release summary
         if: steps.tauri.outputs.releaseHtmlUrl != ''
