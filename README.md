@@ -106,9 +106,9 @@ git push origin v0.2.0
 
 ---
 
-## 4-1. 자동 업데이트 (v0.4.0부터)
+## 4-1. 자동 업데이트 (v0.4.1부터 실제 동작)
 
-v0.4.0부터 앱에 **자동 업데이트 기능**이 들어있다. 앱을 켜면 GitHub Releases의
+앱에 **자동 업데이트 기능**이 들어있다. 앱을 켜면 GitHub Releases의
 `latest.json`을 확인해서 새 버전이 있으면 왼쪽 아래에
 "새 버전이 있습니다 → [지금 설치] / [나중에]" 알림이 뜬다.
 [지금 설치]를 누르면 내려받아 설치하고 앱을 자동으로 다시 시작한다.
@@ -128,23 +128,38 @@ v0.4.0부터 앱에 **자동 업데이트 기능**이 들어있다. 앱을 켜�
 
 | 이름 | 값 |
 |---|---|
-| `TAURI_SIGNING_PRIVATE_KEY` | 서버의 `~/.tauri-keys/tinadmin.key` 파일 **내용 전체** |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 빈 값 (비밀번호 없이 만든 키라 빈 문자열) |
+| `TAURI_SIGNING_PRIVATE_KEY` | 서버의 `~/.tauri-keys/tinadmin.key` 내용 (**base64 한 줄**, `=` 끝까지 전부) |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | **아예 만들지 않거나 빈 값**. 아무 문자나 넣으면 서명 실패 |
 
 서버에서 값 확인:
 ```bash
 cat ~/.tauri-keys/tinadmin.key
 ```
 
+> ℹ️ **키 파일 형식 주의**: 이 파일은 평문이 아니라 **base64로 인코딩된 한 줄**이다.
+> 열어보면 `dW50cnVzdGVkIGNvbW1lbnQ6...` 처럼 보이는 게 정상이다.
+> (디코딩하면 `untrusted comment: rsign encrypted secret key` 로 시작한다 —
+> minisign 이 아니라 **rsign** 이다.)
+> 공개키 파일 `.pub` 도 같은 형식이라 겉보기로는 구분이 안 되니, 파일명으로 구분할 것.
+
 > 🔑 **이 개인키를 잃어버리면 기존 앱들이 업데이트를 못 받는다.**
 > (새 키로 서명하면 기존 앱이 서명 검증에 실패함 → 사용자가 수동 재설치해야 함)
 > `~/.tauri-keys/` 를 꼭 백업해 둘 것.
 
-### 다음 버전에서 자동 업데이트가 뜨는지 확인하는 법
-1. v0.4.0을 PC에 설치해 둔다 (이번엔 수동 설치)
-2. 나중에 코드를 고치고 버전을 0.5.0으로 올려 태그를 push
-3. 빌드가 끝나면 Releases에 `latest.json` 이 함께 올라간다
-4. **설치해 둔 v0.4.0 앱을 껐다가 다시 켜면** 왼쪽 아래에 업데이트 알림이 뜬다
+### 자동 업데이트가 뜨는지 확인하는 법
+1. 앱을 PC에 설치해 둔다 (updater가 실제로 도는 건 **v0.4.1 이상**)
+2. 코드를 고치고 버전을 올려 태그를 push (예: v0.6.0)
+3. 빌드가 끝나면 Releases에 `latest.json` + `.sig` 가 함께 올라간다
+4. **설치해 둔 앱을 완전히 껐다가 다시 켜면** 왼쪽 아래에 업데이트 알림이 뜬다
+
+### 빌드 실패 시 원인 확인
+워크플로우에 `Pre-build (로그 캡처용)` 단계가 있어서, 빌드가 깨지면 에러 마지막 40줄이
+GitHub **annotation** 으로 남는다. annotation 은 리포 admin 권한 없이도 API로 읽을 수 있다:
+```bash
+curl -s "https://api.github.com/repos/bogon0130/tinadmin-desktop/check-runs/<JOB_ID>/annotations"
+```
+> ⚠️ 이 Pre-build 단계는 진단용이라 **빌드를 두 번** 한다(느림).
+> 안정화되면 이 단계를 지우는 게 좋다.
 
 ### 수동으로 빌드 돌리기
 태그를 안 만들고도 Actions 탭 → **Release** 워크플로우 →
