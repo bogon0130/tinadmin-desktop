@@ -59,6 +59,9 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 자동 업데이트 서명키 (GitHub Secrets에 등록되어 있어야 함)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: v__VERSION__
           releaseName: v__VERSION__
@@ -69,7 +72,8 @@ jobs:
           retryAttempts: 2
           args: ${{ matrix.args }}
           assetNamePattern: "[name]-[version]-[platform]-[arch][ext]"
-          includeUpdaterJson: false
+          # latest.json (업데이트 정보 파일) 을 Releases에 같이 올린다 → 앱이 이걸 보고 새 버전 확인
+          includeUpdaterJson: true
 
       - name: Release summary
         if: steps.tauri.outputs.releaseHtmlUrl != ''

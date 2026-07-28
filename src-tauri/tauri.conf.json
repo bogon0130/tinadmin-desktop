@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "tinadmin-desktop",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "com.bogon.tinadmin",
   "build": {
     "beforeDevCommand": "bun run dev",
@@ -27,6 +27,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -34,5 +35,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/bogon0130/tinadmin-desktop/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDFFRjkwRUVEODcxMzlFNkMKUldSc25oT0g3UTc1SGw1bTN4Tnh3ZEJvdjlPTWtwRjZ0NEZmVHZHNVlKVXRGeXg3TnJmbitjSksK"
+    }
   }
 }
