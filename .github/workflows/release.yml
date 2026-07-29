@@ -56,37 +56,6 @@ jobs:
       - name: Install frontend dependencies
         run: bun install
 
-      # 실패 원인을 리포 admin 권한 없이도 확인하기 위해, 먼저 직접 빌드해서
-      # 로그를 파일로 남기고 실패 시 마지막 부분을 annotation(::error::)으로 내보낸다.
-      # annotation 은 공개 API로 읽을 수 있어서 로그 열람 권한이 없어도 원인 파악이 가능하다.
-      - name: Pre-build (로그 캡처용)
-        id: prebuild
-        shell: bash
-        continue-on-error: true
-        env:
-          # 서명이 켜져 있으면 이 단계도 서명을 하므로 동일한 키를 넘겨야 한다.
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          set -o pipefail
-          # 서명키가 실제로 넘어왔는지 값 노출 없이 확인 (원인 파악용)
-          if [ -z "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            echo "::warning::TAURI_SIGNING_PRIVATE_KEY 가 비어 있음 (Secret 미등록/이름 오타 의심)"
-          else
-            echo "서명키 길이: ${#TAURI_SIGNING_PRIVATE_KEY} 자"
-          fi
-          bun run tauri build ${{ matrix.args }} 2>&1 | tee build.log
-
-      - name: 빌드 실패 시 에러 내용을 annotation 으로 출력
-        if: steps.prebuild.outcome == 'failure'
-        shell: bash
-        run: |
-          echo "----- build.log 마지막 120줄 -----"
-          tail -n 120 build.log || true
-          SNIP=$(tail -n 40 build.log | tr '\n' '~' | sed 's/%/%25/g; s/\r/ /g')
-          echo "::error title=BUILD FAIL (tail 40, ~=개행)::${SNIP}"
-          exit 1
-
       - name: Build and publish
         id: tauri
         uses: tauri-apps/tauri-action@action-v0.6.2

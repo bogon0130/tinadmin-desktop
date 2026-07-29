@@ -176,52 +176,193 @@ body {
   }
 }
 
+
 /* ==========================================================================
-   tinadmin 터미널 테마 — 항상 다크 + 초록 포인트 (라이트 모드 비활성)
+   tinadmin HUD 테마 (mockups/2.html 기반)
+   - 글자는 순백(#FFFFFF) 고정. 회색 글자 사용하지 않음
+   - 텍스트 glow 없음. glow 는 테두리와 게이지 바에만
+   - 강조색(초록)은 헤더 / 중요 수치 / 게이지에만
+   - 색/폰트는 설정 패널에서 바꾸면 --tin-* 변수로 전체 반영
    ========================================================================== */
 :root,
 .dark {
-    --background: oklch(0.16 0.008 155);
-    --foreground: oklch(0.92 0.012 150);
-    --card: oklch(0.20 0.010 155);
-    --card-foreground: oklch(0.92 0.012 150);
-    --popover: oklch(0.20 0.010 155);
-    --popover-foreground: oklch(0.92 0.012 150);
-    --primary: oklch(0.76 0.19 150);
-    --primary-foreground: oklch(0.16 0.02 155);
-    --secondary: oklch(0.26 0.012 155);
-    --secondary-foreground: oklch(0.92 0.012 150);
-    --muted: oklch(0.24 0.010 155);
-    --muted-foreground: oklch(0.66 0.018 150);
-    --accent: oklch(0.30 0.030 152);
-    --accent-foreground: oklch(0.92 0.03 150);
-    --destructive: oklch(0.58 0.21 25);
-    --destructive-foreground: oklch(0.98 0 0);
-    --border: oklch(0.30 0.014 155);
-    --input: oklch(0.28 0.014 155);
-    --ring: oklch(0.76 0.19 150);
-    --sidebar: oklch(0.13 0.010 155);
-    --sidebar-foreground: oklch(0.88 0.012 150);
-    --sidebar-primary: oklch(0.76 0.19 150);
-    --sidebar-primary-foreground: oklch(0.14 0.02 155);
-    --sidebar-accent: oklch(0.24 0.020 152);
-    --sidebar-accent-foreground: oklch(0.92 0.03 150);
-    --sidebar-border: oklch(0.26 0.014 155);
-    --sidebar-ring: oklch(0.76 0.19 150);
-    --radius: 0.5rem;
+    /* 설정 패널에서 덮어씀 (theme.ts applyTheme) */
+    --tin-fg: #ffffff;
+    --tin-fg-rgb: 255 255 255;
+    --tin-accent: #3ddc84;
+    --tin-accent-rgb: 61 220 132;
+    --tin-font: "D2Coding", "Cascadia Mono", Consolas, ui-monospace, monospace;
+    --tin-fs: 14px;
+    --tin-fs-mono: 15px;
+    --tin-fs-sm: 12px;
+    --tin-fs-lg: 18px;
+    --tin-fs-xl: 26px;
+
+    /* HUD 배경/패널 (시안2 팔레트를 초록 계열로) */
+    --tin-bg: #060d0a;
+    --tin-panel: #0a1410;
+    --tin-panel2: #0c1a14;
+    --tin-edge: #14503a;
+    --tin-edge-soft: #103d2d;
+
+    /* shadcn 토큰도 같이 맞춰 기존 컴포넌트가 튀지 않게 */
+    --background: var(--tin-bg);
+    --foreground: var(--tin-fg);
+    --card: var(--tin-panel);
+    --card-foreground: var(--tin-fg);
+    --popover: var(--tin-panel);
+    --popover-foreground: var(--tin-fg);
+    --primary: var(--tin-accent);
+    --primary-foreground: #06120c;
+    --secondary: var(--tin-panel2);
+    --secondary-foreground: var(--tin-fg);
+    --muted: var(--tin-panel2);
+    /* 회색 금지 → 보조 텍스트도 흰색 */
+    --muted-foreground: var(--tin-fg);
+    --accent: var(--tin-panel2);
+    --accent-foreground: var(--tin-fg);
+    --destructive: #ff5f56;
+    --destructive-foreground: #ffffff;
+    --border: var(--tin-edge);
+    --input: var(--tin-edge);
+    --ring: var(--tin-accent);
+    --sidebar: #071009;
+    --sidebar-foreground: var(--tin-fg);
+    --sidebar-primary: var(--tin-accent);
+    --sidebar-primary-foreground: #06120c;
+    --sidebar-accent: #0e2419;
+    --sidebar-accent-foreground: var(--tin-fg);
+    --sidebar-border: var(--tin-edge);
+    --sidebar-ring: var(--tin-accent);
+    --radius: 0.6rem;
 }
 
-/* 터미널 느낌 모노스페이스 */
-.font-mono-tin {
-    font-family: "D2Coding", "Cascadia Mono", "Consolas", ui-monospace,
-        SFMono-Regular, Menlo, monospace;
+html, body {
+    background:
+        radial-gradient(1100px 520px at 50% -12%, rgb(var(--tin-accent-rgb) / 0.10), transparent 62%),
+        var(--tin-bg);
+    color: var(--tin-fg);
+    font-family: var(--tin-font);
+    font-size: var(--tin-fs);
+    letter-spacing: 0.2px;
+}
+
+/* 전 페이지: 글자는 흰색, 텍스트 glow 금지 */
+body, body * {
+    text-shadow: none !important;
+}
+
+/* 한글 고정폭 — 한 단계 크게 */
+.font-mono-tin,
+.tin-mono {
+    font-family: var(--tin-font);
+    font-size: var(--tin-fs-mono);
+    font-variant-numeric: tabular-nums;
     font-variant-ligatures: none;
 }
 
-/* 표 스크롤 영역 */
+/* 강조색: 헤더 / 중요 수치 / 게이지 */
+.tin-accent { color: var(--tin-accent); }
+
+/* ---- HUD 패널 (테두리에만 glow) ---- */
+.hud-panel {
+    border: 1px solid var(--tin-edge);
+    border-radius: 12px;
+    background: var(--tin-panel);
+    box-shadow: 0 0 26px rgb(var(--tin-accent-rgb) / 0.10),
+                inset 0 1px 0 rgb(var(--tin-accent-rgb) / 0.13);
+    position: relative;
+    overflow: hidden;
+}
+/* 스캔라인 */
+.hud-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+        0deg,
+        rgb(var(--tin-accent-rgb) / 0.03) 0 1px,
+        transparent 1px 4px
+    );
+}
+.hud-head {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--tin-edge);
+    background: linear-gradient(90deg, rgb(var(--tin-accent-rgb) / 0.14), transparent 62%);
+}
+/* 모서리 마커 */
+.hud-corner::before, .hud-corner::after {
+    content: ""; position: absolute; width: 16px; height: 16px;
+    border: 2px solid var(--tin-accent); opacity: .85;
+}
+.hud-corner::before { left: -1px; top: -1px; border-right: 0; border-bottom: 0; border-radius: 10px 0 0 0; }
+.hud-corner::after { right: -1px; bottom: -1px; border-left: 0; border-top: 0; border-radius: 0 0 10px 0; }
+
+/* 섹션 제목 (헤더 → 강조색) */
+.hud-sect {
+    font-size: var(--tin-fs-sm);
+    color: var(--tin-accent);
+    letter-spacing: 1.6px;
+    margin: 10px 0 8px;
+    display: flex; align-items: center; gap: 9px;
+}
+.hud-sect::after {
+    content: ""; flex: 1; height: 1px;
+    background: linear-gradient(90deg, var(--tin-edge), transparent);
+}
+
+/* ---- 게이지 (glow 유지) ---- */
+.hud-gauge {
+    border: 1px solid var(--tin-edge-soft);
+    border-radius: 9px;
+    padding: 10px 12px;
+    background: var(--tin-panel2);
+}
+.hud-bar {
+    height: 6px; border-radius: 4px;
+    background: #0a2018; overflow: hidden;
+}
+.hud-bar > i {
+    display: block; height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg,
+        rgb(var(--tin-accent-rgb) / 0.45), var(--tin-accent));
+    box-shadow: 0 0 12px rgb(var(--tin-accent-rgb) / 0.55);
+}
+
+/* ---- 표 ---- */
+.hud-table { width: 100%; border-collapse: collapse; font-size: var(--tin-fs-mono); }
+.hud-table th {
+    position: sticky; top: 0; z-index: 1;
+    background: #0b1f17; color: var(--tin-accent);
+    font-weight: 600; text-align: right;
+    padding: 7px 11px; border-bottom: 1px solid var(--tin-edge);
+    font-size: var(--tin-fs-sm); letter-spacing: 1.1px;
+}
+.hud-table th.c1, .hud-table td.c1 { text-align: left; }
+.hud-table td {
+    padding: 4px 11px; text-align: right;
+    border-bottom: 1px solid #0d2419; color: var(--tin-fg);
+}
+/* 값 0 은 흰색 유지하되 살짝 눌러 표시 (회색 아님) */
+.hud-zero { opacity: .35; }
+.hud-dayrow td {
+    background: #0a1c14; color: var(--tin-accent);
+    border-top: 1px solid var(--tin-edge);
+    letter-spacing: 1px; padding: 6px 11px;
+}
+.hud-table tfoot td {
+    position: sticky; bottom: 0;
+    background: #0d2a1e; color: var(--tin-accent);
+    font-weight: 700; border-top: 1px solid var(--tin-edge);
+    padding: 8px 11px;
+}
+
+/* 스크롤바 */
 .tin-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
 .tin-scroll::-webkit-scrollbar-track { background: transparent; }
 .tin-scroll::-webkit-scrollbar-thumb {
-    background: oklch(0.34 0.02 155); border-radius: 5px;
+    background: var(--tin-edge); border-radius: 5px;
 }
-.tin-scroll::-webkit-scrollbar-thumb:hover { background: oklch(0.44 0.05 152); }
+.tin-scroll::-webkit-scrollbar-thumb:hover { background: var(--tin-accent); }

@@ -33,6 +33,15 @@ import {
   stopAll,
 } from "@/lib/api"
 import { TYPE_META } from "@/lib/tin-utils"
+import {
+  ACCENT_PRESETS,
+  DEFAULT_THEME,
+  FONT_OPTIONS,
+  applyTheme,
+  loadTheme,
+  saveTheme,
+  type ThemeSettings,
+} from "@/lib/theme"
 import type { TableType, TinEntry } from "@/lib/types"
 import { LoginScreen } from "@/components/login-screen"
 import { EntryTable } from "@/components/entry-table"
@@ -76,6 +85,12 @@ export default function App() {
   const [dirty, setDirty] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
+  const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
+
+  // 저장된 화면 설정을 시작할 때 적용 (다음 실행에도 유지)
+  useEffect(() => {
+    applyTheme(loadTheme())
+  }, [])
 
   const load = useCallback(async (target: string) => {
     setLoading(true)
@@ -211,6 +226,7 @@ export default function App() {
           <button
             onClick={() => {
               setUrlDraft(getApiUrl())
+              setThemeDraft(loadTheme())
               setShowSettings(true)
             }}
             className="flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-[13px] text-sidebar-foreground transition hover:bg-sidebar-accent/60"
@@ -332,47 +348,217 @@ export default function App() {
       {/* 설정 모달 */}
       {showSettings && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
           onClick={() => setShowSettings(false)}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-border bg-card p-6"
+            className="hud-panel tin-scroll max-h-[88vh] w-full max-w-lg overflow-y-auto p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="mb-4 text-sm font-semibold">설정</h3>
-            <label className="mb-1.5 block text-xs text-muted-foreground">
-              서버 API 주소
+            <h3
+              className="tin-accent mb-4 font-semibold tracking-wide"
+              style={{ fontSize: "var(--tin-fs-lg)" }}
+            >
+              설정
+            </h3>
+
+            {/* 서버 */}
+            <p className="hud-sect">SERVER · 서버</p>
+            <label className="mb-1.5 block" style={{ fontSize: "var(--tin-fs-sm)" }}>
+              API 주소
             </label>
             <input
               value={urlDraft}
               onChange={(e) => setUrlDraft(e.target.value)}
               spellCheck={false}
-              className="font-mono-tin mb-4 w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+              className="tin-mono mb-4 w-full rounded-md border border-[var(--tin-edge)] bg-transparent px-3 py-2 outline-none focus:border-[var(--tin-accent)]"
             />
-            <p className="mb-4 text-[11px] leading-relaxed text-muted-foreground">
-              기본값은{" "}
-              <span className="font-mono-tin">https://tin.bogon.kr</span> 이다.
-              서버가 127.0.0.1 로만 열려 있어 외부에서는 Cloudflare 터널 주소로만
-              접속된다.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowSettings(false)}
-                className="rounded-md border border-border px-3 py-1.5 text-xs transition hover:bg-secondary"
+
+            {/* 화면 */}
+            <p className="hud-sect">DISPLAY · 화면</p>
+
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1.5 block" style={{ fontSize: "var(--tin-fs-sm)" }}>
+                  글자색
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={themeDraft.textColor}
+                    onChange={(e) =>
+                      setThemeDraft({ ...themeDraft, textColor: e.target.value })
+                    }
+                    className="h-8 w-10 cursor-pointer rounded border border-[var(--tin-edge)] bg-transparent"
+                  />
+                  <input
+                    value={themeDraft.textColor}
+                    onChange={(e) =>
+                      setThemeDraft({ ...themeDraft, textColor: e.target.value })
+                    }
+                    className="tin-mono w-full rounded-md border border-[var(--tin-edge)] bg-transparent px-2 py-1.5 outline-none focus:border-[var(--tin-accent)]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block" style={{ fontSize: "var(--tin-fs-sm)" }}>
+                  강조색
+                </label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="color"
+                    value={themeDraft.accentColor}
+                    onChange={(e) =>
+                      setThemeDraft({ ...themeDraft, accentColor: e.target.value })
+                    }
+                    className="h-8 w-10 cursor-pointer rounded border border-[var(--tin-edge)] bg-transparent"
+                  />
+                  <input
+                    value={themeDraft.accentColor}
+                    onChange={(e) =>
+                      setThemeDraft({ ...themeDraft, accentColor: e.target.value })
+                    }
+                    className="tin-mono w-full rounded-md border border-[var(--tin-edge)] bg-transparent px-2 py-1.5 outline-none focus:border-[var(--tin-accent)]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-3 flex flex-wrap gap-1.5">
+              {ACCENT_PRESETS.map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() =>
+                    setThemeDraft({ ...themeDraft, accentColor: p.value })
+                  }
+                  className="rounded-md border px-2.5 py-1"
+                  style={{
+                    fontSize: "var(--tin-fs-sm)",
+                    borderColor:
+                      themeDraft.accentColor.toLowerCase() === p.value
+                        ? p.value
+                        : "var(--tin-edge)",
+                    color: p.value,
+                  }}
+                >
+                  ● {p.label}
+                </button>
+              ))}
+            </div>
+
+            <label className="mb-1.5 block" style={{ fontSize: "var(--tin-fs-sm)" }}>
+              폰트 종류
+            </label>
+            <select
+              value={themeDraft.fontFamily}
+              onChange={(e) =>
+                setThemeDraft({ ...themeDraft, fontFamily: e.target.value })
+              }
+              className="mb-3 w-full rounded-md border border-[var(--tin-edge)] bg-[var(--tin-panel2)] px-2 py-2 outline-none focus:border-[var(--tin-accent)]"
+              style={{ fontSize: "var(--tin-fs-sm)" }}
+            >
+              {FONT_OPTIONS.map((f) => (
+                <option key={f.label} value={f.value}>
+                  {f.label}
+                </option>
+              ))}
+            </select>
+
+            <label className="mb-1.5 block" style={{ fontSize: "var(--tin-fs-sm)" }}>
+              글자 크기 — {themeDraft.fontSize}px
+              <span style={{ opacity: 0.7 }}> (한글 고정폭은 +1px)</span>
+            </label>
+            <input
+              type="range"
+              min={11}
+              max={22}
+              step={1}
+              value={themeDraft.fontSize}
+              onChange={(e) =>
+                setThemeDraft({
+                  ...themeDraft,
+                  fontSize: Number(e.target.value),
+                })
+              }
+              className="mb-3 w-full accent-[var(--tin-accent)]"
+            />
+
+            {/* 미리보기 */}
+            <div
+              className="hud-gauge mb-4"
+              style={{
+                fontFamily: themeDraft.fontFamily,
+                color: themeDraft.textColor,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: `${themeDraft.fontSize + 1}px`,
+                }}
               >
-                취소
-              </button>
+                미리보기 · 한글 ABC 0123{" "}
+                <span style={{ color: themeDraft.accentColor }}>
+                  ← 강조색
+                </span>
+              </div>
+              <div className="hud-bar mt-2">
+                <i
+                  style={{
+                    width: "62%",
+                    background: `linear-gradient(90deg, ${themeDraft.accentColor}55, ${themeDraft.accentColor})`,
+                    boxShadow: `0 0 12px ${themeDraft.accentColor}8c`,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-between gap-2">
               <button
                 onClick={() => {
-                  setApiUrl(urlDraft)
-                  setShowSettings(false)
-                  toast.success("서버 주소 저장됨")
-                  void load(file)
+                  setThemeDraft({ ...DEFAULT_THEME })
+                  applyTheme(DEFAULT_THEME)
                 }}
-                className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:brightness-110"
+                className="rounded-md border border-[var(--tin-edge)] px-3 py-1.5 transition hover:border-[var(--tin-accent)]"
+                style={{ fontSize: "var(--tin-fs-sm)" }}
               >
-                저장
+                기본값
               </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    // 취소하면 저장된 값으로 되돌린다
+                    const saved = loadTheme()
+                    setThemeDraft(saved)
+                    applyTheme(saved)
+                    setShowSettings(false)
+                  }}
+                  className="rounded-md border border-[var(--tin-edge)] px-3 py-1.5 transition hover:border-[var(--tin-accent)]"
+                  style={{ fontSize: "var(--tin-fs-sm)" }}
+                >
+                  취소
+                </button>
+                <button
+                  onClick={() => {
+                    setApiUrl(urlDraft)
+                    saveTheme(themeDraft)
+                    applyTheme(themeDraft)
+                    setShowSettings(false)
+                    toast.success("설정 저장됨", {
+                      description: "다음 실행 때도 유지됩니다.",
+                    })
+                    void load(file)
+                  }}
+                  className="rounded-md px-3 py-1.5 font-semibold"
+                  style={{
+                    fontSize: "var(--tin-fs-sm)",
+                    background: "var(--tin-accent)",
+                    color: "#06120c",
+                  }}
+                >
+                  저장
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -145,6 +145,17 @@ export async function saveNotes(content: string): Promise<void> {
 }
 
 // ---- 레벨업 통계 ----
+export interface LevelEvent {
+  at: string
+  date: string
+  time: string
+  level: number
+  hp: number
+  mp: number
+  mv: number
+  tr: number
+}
+
 export interface CharStats {
   name: string
   count: number
@@ -160,6 +171,7 @@ export interface CharStats {
   avg_per_level: { hp: number; mp: number; mv: number; tr: number }
   daily: { date: string; count: number; hp: number; mp: number; mv: number; tr: number }[]
   hourly: number[]
+  events: LevelEvent[]
 }
 
 export interface StatsMe {
