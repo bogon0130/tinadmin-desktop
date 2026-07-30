@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react"
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
 import {
   AlertTriangle,
   FilePlus2,
@@ -29,11 +35,11 @@ import {
   RenameDialog,
 } from "@/components/file-dialogs"
 import {
-  SNIPPETS,
-  findPlaceholders,
+  SNIPPET_FORMS,
   insertSnippet,
-  type PlaceholderHit,
+  type SnippetForm,
 } from "@/lib/snippets"
+import { SnippetFormDialog } from "@/components/snippet-form"
 
 /** 실행 중 세션이 쓰는 파일 → 창 이름 (서버 config.FILE_TARGETS 와 같은 내용) */
 const IN_USE = new Map<string, string[]>([
@@ -69,8 +75,13 @@ export function FilesView() {
   const [conflict, setConflict] = useState(false)
   const [dialog, setDialog] = useState<"create" | "rename" | "delete" | null>(null)
   const taRef = useRef<HTMLTextAreaElement | null>(null)
-  // 저장 직전 "안 채운 빈칸" 확인용
-  const [pending, setPending] = useState<PlaceholderHit[] | null>(null)
+  // textarea 를 한 번이라도 눌렀는지. selectionStart=0(진짜 맨앞 클릭)과
+  // "아직 포커스한 적 없음"을 구분하기 위해 따로 추적한다.
+  const touchedRef = useRef(false)
+  // 열려 있는 양식 폼
+  const [snipForm, setSnipForm] = useState<SnippetForm | null>(null)
+  // DOM 커밋 직후 복원할 커서 위치 (useLayoutEffect 가 처리)
+  const [restoreSel, setRestoreSel] = useState<[number, number] | null>(null)
 
   const dirty = current !== null && draft !== current.content
   const meta = files.find((f) => f.name === current?.name) ?? null
@@ -109,31 +120,33 @@ export function FilesView() {
     [dirty],
   )
 
-  /** 버튼 클릭 → 커서 위치에 양식 삽입 + 커서 복원 */
+  /** 완성된 tin 줄을 커서 위치에 삽입 */
   function insert(snippetText: string) {
     const ta = taRef.current
-    const selStart = ta ? ta.selectionStart : draft.length
-    const selEnd = ta ? ta.selectionEnd : draft.length
+    // 한 번도 안 눌렀으면 맨끝. 눌렀으면 그 커서 위치를 그대로 쓴다.
+    // (버튼에 onMouseDown preventDefault 를 걸어 포커스를 안 뺏기므로 값이 살아있다)
+    const selStart = ta && touchedRef.current ? ta.selectionStart : draft.length
+    const selEnd = ta && touchedRef.current ? ta.selectionEnd : draft.length
     const r = insertSnippet(draft, selStart, selEnd, snippetText)
     setDraft(r.value)
-    // controlled textarea 라 setDraft 후 커서가 끝으로 튄다 -> 다음 페인트에서 복원
-    requestAnimationFrame(() => {
-      const el = taRef.current
-      if (!el) return
-      el.focus()
-      el.setSelectionRange(r.selStart, r.selEnd)
-    })
+    // controlled textarea 는 value 가 바뀌면 커서가 리셋된다.
+    // rAF 는 React 커밋 전에 돌 수 있어 복원이 덮어써질 수 있으므로,
+    // DOM 커밋 직후 실행이 보장되는 useLayoutEffect 로 복원한다.
+    setRestoreSel([r.selStart, r.selEnd])
+    setSnipForm(null)
   }
 
-  /** 저장 버튼: 안 채운 빈칸이 있으면 먼저 확인받는다 (차단이 아니라 확인) */
-  function requestSave() {
-    const hits = findPlaceholders(draft)
-    if (hits.length > 0) {
-      setPending(hits)
-      return
+  // 삽입 후 커서 복원 — DOM 이 새 value 로 갱신된 다음에 실행된다
+  useLayoutEffect(() => {
+    if (!restoreSel) return
+    const el = taRef.current
+    if (el) {
+      el.focus()
+      el.setSelectionRange(restoreSel[0], restoreSel[1])
+      touchedRef.current = true
     }
-    void handleSave()
-  }
+    setRestoreSel(null)
+  }, [restoreSel])
 
   async function handleSave() {
     if (!current) return
@@ -142,7 +155,6 @@ export function FilesView() {
       const res = await saveTinFile(current.name, draft, current.mtime_raw)
       setCurrent({ ...current, ...res, content: draft })
       setConflict(false)
-      setPending(null)
       toast.success(`✅ 파일 저장됨 — ${res.name}`, {
         description: `백업: ${res.backup ?? "없음"}\n⚠️ 게임엔 미반영 (다음 재접속 때 적용)`,
       })
@@ -396,7 +408,7 @@ export function FilesView() {
                   다시 불러오기
                 </button>
                 <button
-                  onClick={requestSave}
+                  onClick={() => void handleSave()}
                   disabled={saving || !dirty || readOnly}
                   className="flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold disabled:opacity-50"
                   style={{
@@ -442,11 +454,12 @@ export function FilesView() {
                 >
                   양식 넣기
                 </span>
-                {SNIPPETS.map((s) => (
+                {SNIPPET_FORMS.map((s) => (
                   <button
                     key={s.id}
-                    onClick={() => insert(s.text)}
-                    title={`${s.hint}\n\n${s.text}`}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setSnipForm(s)}
+                    title={s.hint}
                     className="rounded-md border px-2.5 py-1 transition hover:border-[var(--tin-accent)]"
                     style={{
                       borderColor: "var(--tin-edge)",
@@ -460,13 +473,16 @@ export function FilesView() {
                   className="ml-auto"
                   style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.6 }}
                 >
-                  &lt;꺾쇠&gt; 부분을 채우세요
+                  칸을 채우면 커서 위치에 들어갑니다
                 </span>
               </div>
             )}
 
             <textarea
               ref={taRef}
+              onMouseUp={() => (touchedRef.current = true)}
+              onKeyUp={() => (touchedRef.current = true)}
+              onFocus={() => (touchedRef.current = true)}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               readOnly={readOnly}
@@ -493,69 +509,12 @@ export function FilesView() {
           onRename={handleRename}
         />
       )}
-      {/* 안 채운 빈칸 확인 — 차단이 아니라 확인 */}
-      {pending && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
-          onClick={() => setPending(null)}
-        >
-          <div
-            className="hud-panel tin-scroll max-h-[80vh] w-full max-w-md overflow-y-auto p-5"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              className="mb-3 font-semibold tracking-wide"
-              style={{ fontSize: "var(--tin-fs-lg)", color: "#f5a524" }}
-            >
-              아직 안 채운 칸이 {pending.length}개 있습니다
-            </h3>
-            <div
-              className="tin-scroll mb-4 max-h-56 overflow-y-auto rounded-md border p-3"
-              style={{ borderColor: "var(--tin-edge)" }}
-            >
-              <ul className="tin-mono space-y-1">
-                {pending.map((h, i) => (
-                  <li key={i} style={{ fontSize: "var(--tin-fs-sm)" }}>
-                    {h.line}줄 · <span style={{ color: "#f5a524" }}>{h.text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            <p
-              className="mb-4 leading-relaxed"
-              style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.8 }}
-            >
-              이대로 저장해도 파일에만 기록되고 게임에는 반영되지 않으므로, 나중에
-              고쳐도 됩니다.
-            </p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setPending(null)}
-                className="rounded-md border px-3 py-1.5"
-                style={{
-                  borderColor: "var(--tin-edge)",
-                  fontSize: "var(--tin-fs-sm)",
-                }}
-              >
-                취소하고 채우기
-              </button>
-              <button
-                onClick={() => {
-                  setPending(null)
-                  void handleSave()
-                }}
-                className="rounded-md px-3 py-1.5 font-semibold"
-                style={{
-                  background: "var(--tin-accent)",
-                  color: "#06120c",
-                  fontSize: "var(--tin-fs-sm)",
-                }}
-              >
-                그래도 저장
-              </button>
-            </div>
-          </div>
-        </div>
+      {snipForm && (
+        <SnippetFormDialog
+          form={snipForm}
+          onClose={() => setSnipForm(null)}
+          onInsert={insert}
+        />
       )}
 
       {dialog === "delete" && meta && (
