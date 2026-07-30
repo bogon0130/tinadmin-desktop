@@ -7,6 +7,7 @@ import {
   Boxes,
   EyeOff,
   FileCode2,
+  FolderCog,
   Highlighter,
   Keyboard,
   Loader2,
@@ -25,6 +26,7 @@ import { Toaster, toast } from "sonner"
 
 import {
   clearToken,
+  listTinFiles,
   getApiUrl,
   getToken,
   loadFile,
@@ -52,10 +54,9 @@ import { PresetsView } from "@/components/presets-view"
 import { NotesView } from "@/components/notes-view"
 import { StatsView } from "@/components/stats-view"
 import { ReferencePanel } from "@/components/reference-panel"
+import { FilesView } from "@/components/files-view"
 
-const FILES = ["한비광.tin", "공용.tin"]
-
-type ViewId = TableType | "presets" | "notes" | "raw" | "stats"
+type ViewId = TableType | "presets" | "notes" | "raw" | "stats" | "files"
 
 const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "action", label: "자반", icon: Zap },
@@ -70,6 +71,7 @@ const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "presets", label: "캐릭터 프리셋", icon: Boxes },
   { id: "notes", label: "정보 저장소", icon: BookText },
   { id: "stats", label: "통계", icon: BarChart3 },
+  { id: "files", label: "파일 관리", icon: FolderCog },
   { id: "raw", label: "Raw 편집", icon: FileCode2 },
 ]
 
@@ -80,7 +82,10 @@ function isTableType(v: ViewId): v is TableType {
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()))
   const [view, setView] = useState<ViewId>("action")
-  const [file, setFile] = useState(FILES[0])
+  // 표 화면 파일 선택기 목록 — 서버에서 받는다(하드코딩 제거).
+  // /api/load 가 다룰 수 있는 파일만 담는다 (table_editable=true)
+  const [tableFiles, setTableFiles] = useState<string[]>([])
+  const [file, setFile] = useState("")
   const [entries, setEntries] = useState<TinEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -95,6 +100,20 @@ export default function App() {
   useEffect(() => {
     applyTheme(loadTheme())
   }, [])
+
+  // 표 화면에서 고를 수 있는 파일 목록을 서버에서 받아온다
+  useEffect(() => {
+    if (!authed) return
+    listTinFiles()
+      .then((list) => {
+        const names = list.filter((f) => f.table_editable).map((f) => f.name)
+        setTableFiles(names)
+        setFile((cur) => (cur && names.includes(cur) ? cur : (names[0] ?? "")))
+      })
+      .catch(() => {
+        // 목록을 못 받아도 앱이 멈추지 않게 (파일 관리 화면에서 다시 시도 가능)
+      })
+  }, [authed])
 
   const load = useCallback(async (target: string) => {
     setLoading(true)
@@ -117,7 +136,8 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (authed) void load(file)
+    // file 은 목록을 받아온 뒤에 채워진다. 빈 값이면 아직 호출하지 않는다.
+    if (authed && file) void load(file)
   }, [authed, file, load])
 
   async function handleSave() {
@@ -187,7 +207,8 @@ export default function App() {
     )
   }
 
-  const usesFile = view !== "presets" && view !== "notes" && view !== "stats"
+  const usesFile =
+    view !== "presets" && view !== "notes" && view !== "stats" && view !== "files"
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -268,7 +289,7 @@ export default function App() {
                 }}
                 className="font-mono-tin rounded-md border border-input bg-background px-2.5 py-1.5 text-xs outline-none focus:border-primary"
               >
-                {FILES.map((f) => (
+                {tableFiles.map((f) => (
                   <option key={f} value={f}>
                     {f}
                   </option>
@@ -359,6 +380,7 @@ export default function App() {
           )}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
+          {view === "files" && <FilesView />}
 
           {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
           {showRef && <ReferencePanel onClose={() => setShowRef(false)} />}

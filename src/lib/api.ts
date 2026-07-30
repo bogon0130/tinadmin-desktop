@@ -237,3 +237,55 @@ export async function listDocs(): Promise<DocMeta[]> {
 export async function getDoc(key: string): Promise<DocContent> {
   return request<DocContent>(`/api/docs/${encodeURIComponent(key)}`)
 }
+
+// ---- tin 파일 관리 (1단계: 읽기 + 편집/저장) ----
+// ★이 경로는 서버에서 tmux #read 를 보내지 않는다★
+//   저장은 파일 + 백업까지만이고, 게임 세션에는 다음 재접속 때 적용된다.
+export interface TinFileMeta {
+  name: string
+  size: number
+  mtime: string
+  mtime_raw: number
+  has_plain_secret: boolean
+  /** 표 편집기(/api/load,/api/save)가 다룰 수 있는 파일인지 (서버 ALLOWED_FILES) */
+  table_editable: boolean
+}
+
+export interface TinFileContent extends TinFileMeta {
+  content: string
+}
+
+export interface TinFileSaveResult {
+  ok: boolean
+  name: string
+  size: number
+  mtime: string
+  mtime_raw: number
+  backup: string | null
+  backups_removed: string[]
+  tmux_sent: boolean
+  note: string
+}
+
+export async function listTinFiles(): Promise<TinFileMeta[]> {
+  const d = await request<{ ok: boolean; files: TinFileMeta[] }>("/api/files")
+  return d.files ?? []
+}
+
+export async function readTinFile(name: string): Promise<TinFileContent> {
+  return request<TinFileContent>(`/api/files/${encodeURIComponent(name)}`)
+}
+
+export async function saveTinFile(
+  name: string,
+  content: string,
+  mtimeRaw: number,
+): Promise<TinFileSaveResult> {
+  return request<TinFileSaveResult>(
+    `/api/files/save/${encodeURIComponent(name)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ content, mtime_raw: mtimeRaw }),
+    },
+  )
+}

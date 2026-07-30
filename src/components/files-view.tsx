@@ -1,0 +1,284 @@
+import { useCallback, useEffect, useState } from "react"
+import { AlertTriangle, KeyRound, Loader2, RefreshCw, Save } from "lucide-react"
+import { toast } from "sonner"
+
+import {
+  listTinFiles,
+  readTinFile,
+  saveTinFile,
+  type TinFileContent,
+  type TinFileMeta,
+} from "@/lib/api"
+
+function fmtSize(n: number) {
+  return n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
+}
+
+/**
+ * tin 파일 관리 (1단계: 읽기 + 편집/저장).
+ *
+ * ★저장해도 게임 세션에는 반영되지 않는다★
+ *   서버의 /api/files/save 는 tmux 로 #read 를 보내지 않는다.
+ *   실행 중인 사냥 자반이 저장 즉시 바뀌는 사고를 막기 위한 의도된 동작이고,
+ *   실시간 반영은 나중에 별도 "적용" 기능으로 만든다.
+ */
+export function FilesView() {
+  const [files, setFiles] = useState<TinFileMeta[]>([])
+  const [current, setCurrent] = useState<TinFileContent | null>(null)
+  const [draft, setDraft] = useState("")
+  const [loadingList, setLoadingList] = useState(true)
+  const [loadingFile, setLoadingFile] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [conflict, setConflict] = useState(false)
+
+  const dirty = current !== null && draft !== current.content
+
+  const loadList = useCallback(async () => {
+    setLoadingList(true)
+    try {
+      setFiles(await listTinFiles())
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setLoadingList(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadList()
+  }, [loadList])
+
+  const open = useCallback(
+    async (name: string) => {
+      if (dirty && !confirm("저장하지 않은 변경이 있습니다. 그래도 열까요?")) return
+      setLoadingFile(true)
+      setConflict(false)
+      try {
+        const f = await readTinFile(name)
+        setCurrent(f)
+        setDraft(f.content)
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : String(e))
+      } finally {
+        setLoadingFile(false)
+      }
+    },
+    [dirty],
+  )
+
+  async function handleSave() {
+    if (!current) return
+    setSaving(true)
+    try {
+      const res = await saveTinFile(current.name, draft, current.mtime_raw)
+      setCurrent({ ...current, ...res, content: draft })
+      setConflict(false)
+      toast.success(`✅ 파일 저장됨 — ${res.name}`, {
+        description: `백업: ${res.backup ?? "없음"}\n⚠️ 게임엔 미반영 (다음 재접속 때 적용)`,
+      })
+      await loadList()
+    } catch (e) {
+      const err = e as Error & { status?: number }
+      if (err.status === 409) {
+        setConflict(true)
+        toast.error("다른 곳에서 이 파일이 바뀌었습니다", {
+          description: "다시 불러온 뒤 편집해주세요. (덮어쓰지 않았습니다)",
+        })
+      } else {
+        toast.error("저장 실패", { description: err.message })
+      }
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1">
+      {/* 좌측: 파일 목록 */}
+      <div
+        className="tin-scroll w-64 shrink-0 overflow-y-auto border-r"
+        style={{ borderColor: "var(--tin-edge)" }}
+      >
+        <div
+          className="flex items-center gap-2 border-b px-3 py-2.5"
+          style={{ borderColor: "var(--tin-edge)" }}
+        >
+          <span
+            className="tin-accent font-semibold tracking-wide"
+            style={{ fontSize: "var(--tin-fs-sm)" }}
+          >
+            tin 파일 {files.length}개
+          </span>
+          <button
+            onClick={() => void loadList()}
+            title="목록 새로고침"
+            className="ml-auto flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
+          >
+            {loadingList ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="size-3.5" />
+            )}
+          </button>
+        </div>
+
+        {files.map((f) => {
+          const active = current?.name === f.name
+          return (
+            <button
+              key={f.name}
+              onClick={() => void open(f.name)}
+              className="block w-full border-b px-3 py-2 text-left transition"
+              style={{
+                borderColor: "var(--tin-edge-soft)",
+                background: active ? "var(--tin-panel2)" : "transparent",
+              }}
+            >
+              <div className="flex items-center gap-1.5">
+                <span
+                  className="tin-mono truncate"
+                  style={{ color: active ? "var(--tin-accent)" : "var(--tin-fg)" }}
+                >
+                  {f.name}
+                </span>
+                {f.has_plain_secret && (
+                  <KeyRound
+                    className="size-3 shrink-0"
+                    style={{ color: "#f5a524" }}
+                  />
+                )}
+              </div>
+              <div style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}>
+                {fmtSize(f.size)} · {f.mtime.slice(5, 16)}
+              </div>
+            </button>
+          )
+        })}
+      </div>
+
+      {/* 우측: 편집기 */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* 상시 배너 */}
+        <div
+          className="shrink-0 border-b px-4 py-2 leading-relaxed"
+          style={{
+            borderColor: "rgb(245 165 36 / 0.35)",
+            background: "rgb(245 165 36 / 0.10)",
+            fontSize: "var(--tin-fs-sm)",
+          }}
+        >
+          <AlertTriangle
+            className="mr-1.5 inline size-3.5"
+            style={{ color: "#f5a524" }}
+          />
+          이 화면의 저장은 <b>파일에만</b> 반영됩니다. 게임 세션에는{" "}
+          <b>다음 재접속 때</b> 적용됩니다. (실시간 적용은 다음 단계)
+        </div>
+
+        {!current ? (
+          <div
+            className="flex flex-1 items-center justify-center"
+            style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}
+          >
+            {loadingFile ? "불러오는 중…" : "왼쪽에서 파일을 선택하세요."}
+          </div>
+        ) : (
+          <>
+            {/* 파일 헤더 */}
+            <div
+              className="flex shrink-0 flex-wrap items-center gap-2 border-b px-4 py-2"
+              style={{ borderColor: "var(--tin-edge)" }}
+            >
+              <span className="tin-accent tin-mono font-semibold">
+                {current.name}
+              </span>
+              <span style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}>
+                {fmtSize(current.size)} · 수정 {current.mtime}
+              </span>
+              {current.has_plain_secret && (
+                <span
+                  className="rounded-full border px-2 py-0.5"
+                  style={{
+                    fontSize: "var(--tin-fs-sm)",
+                    borderColor: "#f5a524",
+                    color: "#f5a524",
+                  }}
+                >
+                  평문 비번 있음
+                </span>
+              )}
+              {dirty && (
+                <span
+                  className="rounded px-2 py-0.5"
+                  style={{
+                    fontSize: "var(--tin-fs-sm)",
+                    background: "rgb(245 165 36 / 0.18)",
+                    color: "#f5a524",
+                  }}
+                >
+                  저장 안 됨
+                </span>
+              )}
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => void open(current.name)}
+                  className="rounded-md border px-3 py-1.5"
+                  style={{
+                    borderColor: "var(--tin-edge)",
+                    fontSize: "var(--tin-fs-sm)",
+                  }}
+                >
+                  다시 불러오기
+                </button>
+                <button
+                  onClick={() => void handleSave()}
+                  disabled={saving || !dirty}
+                  className="flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold disabled:opacity-50"
+                  style={{
+                    fontSize: "var(--tin-fs-sm)",
+                    background: "var(--tin-accent)",
+                    color: "#06120c",
+                  }}
+                >
+                  {saving ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <Save className="size-3.5" />
+                  )}
+                  저장
+                </button>
+              </div>
+            </div>
+
+            {/* 충돌 안내 */}
+            {conflict && (
+              <div
+                className="shrink-0 border-b px-4 py-2"
+                style={{
+                  borderColor: "rgb(255 95 86 / 0.4)",
+                  background: "rgb(255 95 86 / 0.12)",
+                  fontSize: "var(--tin-fs-sm)",
+                }}
+              >
+                다른 곳에서 이 파일이 바뀌었습니다. <b>다시 불러오세요.</b> 지금
+                내용을 저장하면 남의 편집을 덮어쓰게 되어 서버가 거부했습니다.
+              </div>
+            )}
+
+            <textarea
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              spellCheck={false}
+              className="tin-mono tin-scroll min-h-0 flex-1 resize-none border-0 p-4 leading-relaxed outline-none"
+              style={{
+                background: "var(--tin-bg)",
+                color: "var(--tin-fg)",
+                whiteSpace: "pre",
+              }}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
