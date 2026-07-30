@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import {
   AlertTriangle,
   FilePlus2,
@@ -28,6 +28,12 @@ import {
   ReadOnlyBadge,
   RenameDialog,
 } from "@/components/file-dialogs"
+import {
+  SNIPPETS,
+  findPlaceholders,
+  insertSnippet,
+  type PlaceholderHit,
+} from "@/lib/snippets"
 
 /** 실행 중 세션이 쓰는 파일 → 창 이름 (서버 config.FILE_TARGETS 와 같은 내용) */
 const IN_USE = new Map<string, string[]>([
@@ -62,6 +68,9 @@ export function FilesView() {
   const [saving, setSaving] = useState(false)
   const [conflict, setConflict] = useState(false)
   const [dialog, setDialog] = useState<"create" | "rename" | "delete" | null>(null)
+  const taRef = useRef<HTMLTextAreaElement | null>(null)
+  // 저장 직전 "안 채운 빈칸" 확인용
+  const [pending, setPending] = useState<PlaceholderHit[] | null>(null)
 
   const dirty = current !== null && draft !== current.content
   const meta = files.find((f) => f.name === current?.name) ?? null
@@ -100,6 +109,32 @@ export function FilesView() {
     [dirty],
   )
 
+  /** 버튼 클릭 → 커서 위치에 양식 삽입 + 커서 복원 */
+  function insert(snippetText: string) {
+    const ta = taRef.current
+    const selStart = ta ? ta.selectionStart : draft.length
+    const selEnd = ta ? ta.selectionEnd : draft.length
+    const r = insertSnippet(draft, selStart, selEnd, snippetText)
+    setDraft(r.value)
+    // controlled textarea 라 setDraft 후 커서가 끝으로 튄다 -> 다음 페인트에서 복원
+    requestAnimationFrame(() => {
+      const el = taRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(r.selStart, r.selEnd)
+    })
+  }
+
+  /** 저장 버튼: 안 채운 빈칸이 있으면 먼저 확인받는다 (차단이 아니라 확인) */
+  function requestSave() {
+    const hits = findPlaceholders(draft)
+    if (hits.length > 0) {
+      setPending(hits)
+      return
+    }
+    void handleSave()
+  }
+
   async function handleSave() {
     if (!current) return
     setSaving(true)
@@ -107,6 +142,7 @@ export function FilesView() {
       const res = await saveTinFile(current.name, draft, current.mtime_raw)
       setCurrent({ ...current, ...res, content: draft })
       setConflict(false)
+      setPending(null)
       toast.success(`✅ 파일 저장됨 — ${res.name}`, {
         description: `백업: ${res.backup ?? "없음"}\n⚠️ 게임엔 미반영 (다음 재접속 때 적용)`,
       })
@@ -360,7 +396,7 @@ export function FilesView() {
                   다시 불러오기
                 </button>
                 <button
-                  onClick={() => void handleSave()}
+                  onClick={requestSave}
                   disabled={saving || !dirty || readOnly}
                   className="flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold disabled:opacity-50"
                   style={{
@@ -394,7 +430,43 @@ export function FilesView() {
               </div>
             )}
 
+            {/* 양식 삽입 버튼 — tin 문법을 몰라도 빈칸만 채우면 되게 */}
+            {!readOnly && (
+              <div
+                className="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2"
+                style={{ borderColor: "var(--tin-edge)" }}
+              >
+                <span
+                  style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}
+                  className="mr-1"
+                >
+                  양식 넣기
+                </span>
+                {SNIPPETS.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => insert(s.text)}
+                    title={`${s.hint}\n\n${s.text}`}
+                    className="rounded-md border px-2.5 py-1 transition hover:border-[var(--tin-accent)]"
+                    style={{
+                      borderColor: "var(--tin-edge)",
+                      fontSize: "var(--tin-fs-sm)",
+                    }}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+                <span
+                  className="ml-auto"
+                  style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.6 }}
+                >
+                  &lt;꺾쇠&gt; 부분을 채우세요
+                </span>
+              </div>
+            )}
+
             <textarea
+              ref={taRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               readOnly={readOnly}
@@ -421,6 +493,71 @@ export function FilesView() {
           onRename={handleRename}
         />
       )}
+      {/* 안 채운 빈칸 확인 — 차단이 아니라 확인 */}
+      {pending && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+          onClick={() => setPending(null)}
+        >
+          <div
+            className="hud-panel tin-scroll max-h-[80vh] w-full max-w-md overflow-y-auto p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3
+              className="mb-3 font-semibold tracking-wide"
+              style={{ fontSize: "var(--tin-fs-lg)", color: "#f5a524" }}
+            >
+              아직 안 채운 칸이 {pending.length}개 있습니다
+            </h3>
+            <div
+              className="tin-scroll mb-4 max-h-56 overflow-y-auto rounded-md border p-3"
+              style={{ borderColor: "var(--tin-edge)" }}
+            >
+              <ul className="tin-mono space-y-1">
+                {pending.map((h, i) => (
+                  <li key={i} style={{ fontSize: "var(--tin-fs-sm)" }}>
+                    {h.line}줄 · <span style={{ color: "#f5a524" }}>{h.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <p
+              className="mb-4 leading-relaxed"
+              style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.8 }}
+            >
+              이대로 저장해도 파일에만 기록되고 게임에는 반영되지 않으므로, 나중에
+              고쳐도 됩니다.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPending(null)}
+                className="rounded-md border px-3 py-1.5"
+                style={{
+                  borderColor: "var(--tin-edge)",
+                  fontSize: "var(--tin-fs-sm)",
+                }}
+              >
+                취소하고 채우기
+              </button>
+              <button
+                onClick={() => {
+                  setPending(null)
+                  void handleSave()
+                }}
+                className="rounded-md px-3 py-1.5 font-semibold"
+                style={{
+                  background: "var(--tin-accent)",
+                  color: "#06120c",
+                  fontSize: "var(--tin-fs-sm)",
+                }}
+              >
+                그래도 저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {dialog === "delete" && meta && (
         <DeleteDialog
           file={meta}
