@@ -216,3 +216,24 @@ export async function getStatsOthers(
 ): Promise<StatsOthers> {
   return request<StatsOthers>(`/api/stats/others${rangeQuery(from, to)}`)
 }
+
+// ---- 운영 참고서 (docs/*.md) ----
+export interface DocMeta {
+  name: string
+  key: string
+  size: number
+  mtime: string
+}
+
+export interface DocContent extends DocMeta {
+  content: string
+}
+
+export async function listDocs(): Promise<DocMeta[]> {
+  const d = await request<{ ok: boolean; docs: DocMeta[] }>("/api/docs")
+  return d.docs ?? []
+}
+
+export async function getDoc(key: string): Promise<DocContent> {
+  return request<DocContent>(`/api/docs/${encodeURIComponent(key)}`)
+}

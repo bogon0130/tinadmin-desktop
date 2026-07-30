@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import {
   AlarmClock,
   BarChart3,
+  BookOpen,
   BookText,
   Boxes,
   EyeOff,
@@ -50,6 +51,7 @@ import { RawView } from "@/components/raw-view"
 import { PresetsView } from "@/components/presets-view"
 import { NotesView } from "@/components/notes-view"
 import { StatsView } from "@/components/stats-view"
+import { ReferencePanel } from "@/components/reference-panel"
 
 const FILES = ["한비광.tin", "공용.tin"]
 
@@ -84,6 +86,8 @@ export default function App() {
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  // 참고서 패널 — 기본은 접힘 (필요할 때 상단 버튼으로 펼침)
+  const [showRef, setShowRef] = useState(false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
   const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
 
@@ -297,6 +301,18 @@ export default function App() {
 
           <div className="ml-auto flex items-center gap-2">
             <button
+              onClick={() => setShowRef((v) => !v)}
+              title="운영 참고서 (서버 docs/참고서.md)"
+              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition"
+              style={{
+                borderColor: showRef ? "var(--tin-accent)" : "var(--tin-edge)",
+                color: showRef ? "var(--tin-accent)" : "var(--tin-fg)",
+              }}
+            >
+              <BookOpen className="size-3.5" />
+              참고서
+            </button>
+            <button
               onClick={handleStopAll}
               className="flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
             >
@@ -325,7 +341,8 @@ export default function App() {
                   setDirty(true)
                 }}
               />
-              <Cheatsheet type={view} />
+              {/* 참고서를 펼치면 치트시트는 접는다 (좁은 화면에서 표가 눌리지 않게) */}
+              {!showRef && <Cheatsheet type={view} />}
             </>
           )}
           {view === "raw" && (
@@ -342,6 +359,9 @@ export default function App() {
           )}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
+
+          {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
+          {showRef && <ReferencePanel onClose={() => setShowRef(false)} />}
         </div>
       </div>
 
