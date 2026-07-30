@@ -249,6 +249,10 @@ export interface TinFileMeta {
   has_plain_secret: boolean
   /** 표 편집기(/api/load,/api/save)가 다룰 수 있는 파일인지 (서버 ALLOWED_FILES) */
   table_editable: boolean
+  /** 읽기만 되고 저장/이름변경/삭제는 막히는 파일 (main.tin — 부팅 진입점) */
+  read_only: boolean
+  /** 이 파일을 #read 하는 파일 수. 0이면 지워도 아무것도 안 깨진다 */
+  referrer_count: number
 }
 
 export interface TinFileContent extends TinFileMeta {
@@ -287,5 +291,71 @@ export async function saveTinFile(
       method: "POST",
       body: JSON.stringify({ content, mtime_raw: mtimeRaw }),
     },
+  )
+}
+
+// ---- 2단계: 참조 조회 / 생성 / 이름변경 / 삭제 (전부 #read 미전송) ----
+export interface Referrer {
+  source: string
+  line: number
+  raw: string
+}
+
+export interface RefsResult {
+  name: string
+  referrers: Referrer[]
+  referrer_files: string[]
+  referrer_count: number
+  referrer_lines: number
+}
+
+export interface CreateResult {
+  name: string
+  size: number
+  mtime: string
+  mtime_raw: number
+  note: string
+}
+
+export interface RenameResult {
+  old_name: string
+  name: string
+  backup: string | null
+  note: string
+}
+
+export interface DeleteResult {
+  name: string
+  trash: string
+  in_use_windows: string[]
+  in_use_warning: string | null
+  note: string
+}
+
+export async function getFileRefs(name: string): Promise<RefsResult> {
+  return request<RefsResult>(`/api/files/refs/${encodeURIComponent(name)}`)
+}
+
+export async function createTinFile(name: string): Promise<CreateResult> {
+  return request<CreateResult>("/api/files/create", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  })
+}
+
+export async function renameTinFile(
+  name: string,
+  newName: string,
+): Promise<RenameResult> {
+  return request<RenameResult>(
+    `/api/files/rename/${encodeURIComponent(name)}`,
+    { method: "POST", body: JSON.stringify({ new_name: newName }) },
+  )
+}
+
+export async function deleteTinFile(name: string): Promise<DeleteResult> {
+  return request<DeleteResult>(
+    `/api/files/delete/${encodeURIComponent(name)}`,
+    { method: "POST", body: JSON.stringify({}) },
   )
 }

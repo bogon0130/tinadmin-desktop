@@ -1,14 +1,45 @@
 import { useCallback, useEffect, useState } from "react"
-import { AlertTriangle, KeyRound, Loader2, RefreshCw, Save } from "lucide-react"
+import {
+  AlertTriangle,
+  FilePlus2,
+  KeyRound,
+  Loader2,
+  Lock,
+  Pencil,
+  RefreshCw,
+  Save,
+  Trash2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import {
+  createTinFile,
+  deleteTinFile,
   listTinFiles,
   readTinFile,
+  renameTinFile,
   saveTinFile,
   type TinFileContent,
   type TinFileMeta,
 } from "@/lib/api"
+import {
+  CreateDialog,
+  DeleteDialog,
+  ReadOnlyBadge,
+  RenameDialog,
+} from "@/components/file-dialogs"
+
+/** 실행 중 세션이 쓰는 파일 → 창 이름 (서버 config.FILE_TARGETS 와 같은 내용) */
+const IN_USE = new Map<string, string[]>([
+  ["한비광.tin", ["한비광"]],
+  ["담화린.tin", ["담화린"]],
+  ["최상희.tin", ["최상희"]],
+  ["초운현.tin", ["초운현"]],
+  ["복병.tin", ["복병"]],
+  ["공용.tin", ["한비광", "담화린", "최상희", "초운현"]],
+  ["stats.tin", ["한비광", "담화린", "최상희"]],
+  ["발석차.tin", ["복병"]],
+])
 
 function fmtSize(n: number) {
   return n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
@@ -30,8 +61,11 @@ export function FilesView() {
   const [loadingFile, setLoadingFile] = useState(false)
   const [saving, setSaving] = useState(false)
   const [conflict, setConflict] = useState(false)
+  const [dialog, setDialog] = useState<"create" | "rename" | "delete" | null>(null)
 
   const dirty = current !== null && draft !== current.content
+  const meta = files.find((f) => f.name === current?.name) ?? null
+  const readOnly = meta?.read_only ?? false
 
   const loadList = useCallback(async () => {
     setLoadingList(true)
@@ -92,6 +126,61 @@ export function FilesView() {
     }
   }
 
+  async function handleCreate(name: string) {
+    try {
+      const res = await createTinFile(name)
+      toast.success(`✅ 새 파일 만듦 — ${res.name}`, {
+        description: "⚠️ 게임엔 미반영 (다음 재접속 때 적용)",
+      })
+      setDialog(null)
+      await loadList()
+      await open(res.name)
+    } catch (e) {
+      toast.error("만들기 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  async function handleRename(newName: string) {
+    if (!current) return
+    try {
+      const res = await renameTinFile(current.name, newName)
+      toast.success(`✅ 이름 바꿈 — ${res.old_name} → ${res.name}`, {
+        description: `백업: ${res.backup ?? "없음"}\n⚠️ 게임엔 미반영`,
+      })
+      setDialog(null)
+      await loadList()
+      await open(res.name)
+    } catch (e) {
+      const err = e as Error & { status?: number }
+      toast.error(
+        err.status === 409 ? "참조 중이라 이름을 바꿀 수 없습니다" : "이름 변경 실패",
+        { description: err.message },
+      )
+    }
+  }
+
+  async function handleDelete() {
+    if (!current) return
+    try {
+      const res = await deleteTinFile(current.name)
+      toast.success(`🗑 휴지통으로 옮김 — ${res.name}`, {
+        description: res.in_use_warning ?? "되돌리려면 서버의 _trash 폴더에서 꺼내세요.",
+      })
+      setDialog(null)
+      setCurrent(null)
+      setDraft("")
+      await loadList()
+    } catch (e) {
+      const err = e as Error & { status?: number }
+      toast.error(
+        err.status === 409 ? "참조 중이라 삭제할 수 없습니다" : "삭제 실패",
+        { description: err.message },
+      )
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-1">
       {/* 좌측: 파일 목록 */}
@@ -110,9 +199,17 @@ export function FilesView() {
             tin 파일 {files.length}개
           </span>
           <button
+            onClick={() => setDialog("create")}
+            title="새 파일 만들기"
+            className="ml-auto flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
+            style={{ color: "var(--tin-accent)" }}
+          >
+            <FilePlus2 className="size-3.5" />
+          </button>
+          <button
             onClick={() => void loadList()}
             title="목록 새로고침"
-            className="ml-auto flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
+            className="flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
           >
             {loadingList ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -147,9 +244,11 @@ export function FilesView() {
                     style={{ color: "#f5a524" }}
                   />
                 )}
+                {f.read_only && <Lock className="size-3 shrink-0 opacity-70" />}
               </div>
               <div style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}>
                 {fmtSize(f.size)} · {f.mtime.slice(5, 16)}
+                {f.referrer_count > 0 && ` · 참조 ${f.referrer_count}`}
               </div>
             </button>
           )
@@ -219,7 +318,37 @@ export function FilesView() {
                   저장 안 됨
                 </span>
               )}
+              {readOnly && <ReadOnlyBadge />}
               <div className="ml-auto flex items-center gap-2">
+                {meta && !readOnly && (
+                  <>
+                    <button
+                      onClick={() => setDialog("rename")}
+                      title="이름 바꾸기"
+                      className="flex items-center gap-1 rounded-md border px-2.5 py-1.5"
+                      style={{
+                        borderColor: "var(--tin-edge)",
+                        fontSize: "var(--tin-fs-sm)",
+                      }}
+                    >
+                      <Pencil className="size-3.5" />
+                      이름
+                    </button>
+                    <button
+                      onClick={() => setDialog("delete")}
+                      title="삭제 (휴지통으로)"
+                      className="flex items-center gap-1 rounded-md border px-2.5 py-1.5"
+                      style={{
+                        borderColor: "rgb(255 95 86 / 0.45)",
+                        color: "var(--destructive)",
+                        fontSize: "var(--tin-fs-sm)",
+                      }}
+                    >
+                      <Trash2 className="size-3.5" />
+                      삭제
+                    </button>
+                  </>
+                )}
                 <button
                   onClick={() => void open(current.name)}
                   className="rounded-md border px-3 py-1.5"
@@ -232,7 +361,7 @@ export function FilesView() {
                 </button>
                 <button
                   onClick={() => void handleSave()}
-                  disabled={saving || !dirty}
+                  disabled={saving || !dirty || readOnly}
                   className="flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold disabled:opacity-50"
                   style={{
                     fontSize: "var(--tin-fs-sm)",
@@ -268,6 +397,7 @@ export function FilesView() {
             <textarea
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
+              readOnly={readOnly}
               spellCheck={false}
               className="tin-mono tin-scroll min-h-0 flex-1 resize-none border-0 p-4 leading-relaxed outline-none"
               style={{
@@ -279,6 +409,26 @@ export function FilesView() {
           </>
         )}
       </div>
+
+      {/* 다이얼로그 */}
+      {dialog === "create" && (
+        <CreateDialog onClose={() => setDialog(null)} onCreate={handleCreate} />
+      )}
+      {dialog === "rename" && meta && (
+        <RenameDialog
+          file={meta}
+          onClose={() => setDialog(null)}
+          onRename={handleRename}
+        />
+      )}
+      {dialog === "delete" && meta && (
+        <DeleteDialog
+          file={meta}
+          inUseWindows={IN_USE.get(meta.name) ?? []}
+          onClose={() => setDialog(null)}
+          onDelete={handleDelete}
+        />
+      )}
     </div>
   )
 }
