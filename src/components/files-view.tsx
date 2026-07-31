@@ -22,12 +22,18 @@ import {
   createTinFile,
   deleteTinFile,
   listTinFiles,
+  readParsed,
   readTinFile,
   renameTinFile,
+  saveParsed,
   saveTinFile,
+  type ParsedFile,
   type TinFileContent,
   type TinFileMeta,
 } from "@/lib/api"
+import { EntryTable } from "@/components/entry-table"
+import { TYPE_META } from "@/lib/tin-utils"
+import type { TableType } from "@/lib/types"
 import {
   CreateDialog,
   DeleteDialog,
@@ -82,6 +88,12 @@ export function FilesView() {
   const [snipForm, setSnipForm] = useState<SnippetForm | null>(null)
   // DOM 커밋 직후 복원할 커서 위치 (useLayoutEffect 가 처리)
   const [restoreSel, setRestoreSel] = useState<[number, number] | null>(null)
+  // [원문] / [표] 탭
+  const [tab, setTab] = useState<"raw" | "table">("raw")
+  const [parsed, setParsed] = useState<ParsedFile | null>(null)
+  const [tableType, setTableType] = useState<TableType>("action")
+  const [tableDirty, setTableDirty] = useState(false)
+  const [tableSaving, setTableSaving] = useState(false)
 
   const dirty = current !== null && draft !== current.content
   const meta = files.find((f) => f.name === current?.name) ?? null
@@ -111,6 +123,9 @@ export function FilesView() {
         const f = await readTinFile(name)
         setCurrent(f)
         setDraft(f.content)
+        setParsed(null)
+        setTableDirty(false)
+        setTab("raw")
       } catch (e) {
         toast.error(e instanceof Error ? e.message : String(e))
       } finally {
@@ -119,6 +134,52 @@ export function FilesView() {
     },
     [dirty],
   )
+
+  /** 표 탭으로 전환 — 필요하면 파싱해서 받아온다 */
+  async function openTable() {
+    if (!current) return
+    setTab("table")
+    if (parsed && parsed.name === current.name) return
+    try {
+      setParsed(await readParsed(current.name))
+      setTableDirty(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e))
+      setTab("raw")
+    }
+  }
+
+  /** 표에서 편집한 내용 저장 — #read 는 안 나간다 */
+  async function handleSaveTable() {
+    if (!parsed) return
+    setTableSaving(true)
+    try {
+      const res = await saveParsed(parsed.name, parsed.entries, parsed.mtime_raw)
+      toast.success(`✅ 파일 저장됨 — ${res.name}`, {
+        description: `백업: ${res.backup ?? "없음"}\n⚠️ 게임엔 미반영 (다음 재접속 때 적용)`,
+      })
+      // 저장 후 최신 mtime 으로 갱신 + 원문 탭도 다시 읽어둔다
+      setParsed(await readParsed(parsed.name))
+      setTableDirty(false)
+      const f = await readTinFile(parsed.name)
+      setCurrent(f)
+      setDraft(f.content)
+      await loadList()
+    } catch (e) {
+      const err = e as Error & { status?: number }
+      toast.error(
+        err.status === 409 ? "다른 곳에서 이 파일이 바뀌었습니다" : "저장 실패",
+        {
+          description:
+            err.status === 409
+              ? "표 탭을 다시 열어 최신 내용을 받아주세요."
+              : err.message,
+        },
+      )
+    } finally {
+      setTableSaving(false)
+    }
+  }
 
   /** 완성된 tin 줄을 커서 위치에 삽입 */
   function insert(snippetText: string) {
@@ -354,7 +415,7 @@ export function FilesView() {
                   평문 비번 있음
                 </span>
               )}
-              {dirty && (
+              {(tab === "table" ? tableDirty : dirty) && (
                 <span
                   className="rounded px-2 py-0.5"
                   style={{
@@ -367,6 +428,26 @@ export function FilesView() {
                 </span>
               )}
               {readOnly && <ReadOnlyBadge />}
+
+              {/* 원문 / 표 탭 */}
+              <div className="flex rounded-md border p-0.5" style={{ borderColor: "var(--tin-edge)" }}>
+                {([["raw","원문"],["table","표"]] as const).map(([k, lb]) => (
+                  <button
+                    key={k}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => (k === "table" ? void openTable() : setTab("raw"))}
+                    className="rounded px-3 py-1 font-medium transition"
+                    style={{
+                      fontSize: "var(--tin-fs-sm)",
+                      background: tab === k ? "var(--tin-accent)" : "transparent",
+                      color: tab === k ? "#06120c" : "var(--tin-fg)",
+                    }}
+                  >
+                    {lb}
+                  </button>
+                ))}
+              </div>
+
               <div className="ml-auto flex items-center gap-2">
                 {meta && !readOnly && (
                   <>
@@ -408,8 +489,16 @@ export function FilesView() {
                   다시 불러오기
                 </button>
                 <button
-                  onClick={() => void handleSave()}
-                  disabled={saving || !dirty || readOnly}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() =>
+                    tab === "table" ? void handleSaveTable() : void handleSave()
+                  }
+                  disabled={
+                    readOnly ||
+                    (tab === "table"
+                      ? tableSaving || !tableDirty
+                      : saving || !dirty)
+                  }
                   className="flex items-center gap-1.5 rounded-md px-3 py-1.5 font-semibold disabled:opacity-50"
                   style={{
                     fontSize: "var(--tin-fs-sm)",
@@ -417,7 +506,7 @@ export function FilesView() {
                     color: "#06120c",
                   }}
                 >
-                  {saving ? (
+                  {saving || tableSaving ? (
                     <Loader2 className="size-3.5 animate-spin" />
                   ) : (
                     <Save className="size-3.5" />
@@ -443,7 +532,7 @@ export function FilesView() {
             )}
 
             {/* 양식 삽입 버튼 — tin 문법을 몰라도 빈칸만 채우면 되게 */}
-            {!readOnly && (
+            {tab === "raw" && !readOnly && (
               <div
                 className="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2"
                 style={{ borderColor: "var(--tin-edge)" }}
@@ -478,6 +567,80 @@ export function FilesView() {
               </div>
             )}
 
+            {tab === "table" ? (
+              !parsed ? (
+                <div
+                  className="flex flex-1 items-center justify-center"
+                  style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}
+                >
+                  불러오는 중…
+                </div>
+              ) : (
+                <div className="flex min-h-0 flex-1 flex-col">
+                  {/* 종류 선택 + raw 안내 */}
+                  <div
+                    className="flex shrink-0 flex-wrap items-center gap-1.5 border-b px-4 py-2"
+                    style={{ borderColor: "var(--tin-edge)" }}
+                  >
+                    {(Object.keys(TYPE_META) as TableType[]).map((t) => {
+                      const n = parsed.entries.filter((e) => e.type === t).length
+                      return (
+                        <button
+                          key={t}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => setTableType(t)}
+                          className="rounded-md border px-2.5 py-1"
+                          style={{
+                            fontSize: "var(--tin-fs-sm)",
+                            borderColor:
+                              tableType === t
+                                ? "var(--tin-accent)"
+                                : "var(--tin-edge)",
+                            color:
+                              tableType === t
+                                ? "var(--tin-accent)"
+                                : "var(--tin-fg)",
+                            opacity: n === 0 && tableType !== t ? 0.5 : 1,
+                          }}
+                        >
+                          {TYPE_META[t].label.split(" ")[0]}
+                          {n > 0 && ` ${n}`}
+                        </button>
+                      )
+                    })}
+                    {parsed.raw_count > 0 && (
+                      <span
+                        className="ml-auto"
+                        style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.75 }}
+                      >
+                        표로 못 쪼개는 항목 {parsed.raw_count}개는{" "}
+                        <b>[원문] 탭에서 편집</b>하세요
+                      </span>
+                    )}
+                  </div>
+
+                  {readOnly ? (
+                    <div
+                      className="flex flex-1 items-center justify-center px-6 text-center leading-relaxed"
+                      style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.8 }}
+                    >
+                      {parsed.name} 은(는) 부팅 진입점이라 읽기 전용입니다.
+                      <br />
+                      내용은 [원문] 탭에서 볼 수 있습니다.
+                    </div>
+                  ) : (
+                    <EntryTable
+                      type={tableType}
+                      entries={parsed.entries}
+                      onChange={(next) => {
+                        setParsed({ ...parsed, entries: next })
+                        setTableDirty(true)
+                      }}
+                    />
+                  )}
+                </div>
+              )
+            ) : (
             <textarea
               ref={taRef}
               onMouseUp={() => (touchedRef.current = true)}
@@ -494,6 +657,7 @@ export function FilesView() {
                 whiteSpace: "pre",
               }}
             />
+            )}
           </>
         )}
       </div>

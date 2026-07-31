@@ -359,3 +359,33 @@ export async function deleteTinFile(name: string): Promise<DeleteResult> {
     { method: "POST", body: JSON.stringify({}) },
   )
 }
+
+// ---- 표 편집 (파일관리 경로 — 저장해도 #read 안 나감) ----
+export interface ParsedFile {
+  name: string
+  entries: TinEntry[]
+  mtime: string
+  mtime_raw: number
+  read_only: boolean
+  raw_count: number
+  editable_count: number
+  note: string
+}
+
+export async function readParsed(name: string): Promise<ParsedFile> {
+  return request<ParsedFile>(`/api/files/parsed/${encodeURIComponent(name)}`)
+}
+
+export async function saveParsed(
+  name: string,
+  entries: TinEntry[],
+  mtimeRaw: number,
+): Promise<TinFileSaveResult> {
+  return request<TinFileSaveResult>(
+    `/api/files/save-parsed/${encodeURIComponent(name)}`,
+    {
+      method: "POST",
+      body: JSON.stringify({ entries, mtime_raw: mtimeRaw }),
+    },
+  )
+}
