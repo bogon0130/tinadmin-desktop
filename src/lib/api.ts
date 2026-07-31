@@ -457,3 +457,82 @@ export async function moveTinFile(
     body: JSON.stringify({ from, to, force }),
   })
 }
+
+// ---- 접속 조합 빌더 ----
+export interface ComboIssue {
+  file: string
+  line: number
+  kind: string
+  message: string
+}
+
+export interface ComboValidation {
+  ok: boolean
+  level: "success" | "warning" | "error"
+  checked: string[]
+  errors: ComboIssue[]
+  warnings: ComboIssue[]
+  summary: string
+}
+
+export interface ComboSources {
+  files: string[]
+  defaults: { host: string; port: string; ssh: string; tmux_session: string }
+}
+
+export interface ComboResult {
+  name: string
+  combo: string
+  session: string
+  host: string
+  port: string
+  files: string[]
+  size: number
+  content: string
+  backup: string | null
+  warnings: ComboIssue[]
+  note: string
+}
+
+export interface BatResult {
+  mode: string
+  filename: string
+  content: string
+  ssh_target: string
+  description: string
+}
+
+export async function comboSources(): Promise<ComboSources> {
+  return request<ComboSources>("/api/combo/sources")
+}
+
+export async function comboValidate(files: string[]): Promise<ComboValidation> {
+  return request<ComboValidation>("/api/combo/validate", {
+    method: "POST",
+    body: JSON.stringify({ files }),
+  })
+}
+
+export async function comboCreate(
+  name: string,
+  files: string[],
+  session: string,
+  host: string,
+  port: string,
+): Promise<ComboResult> {
+  return request<ComboResult>("/api/combo/create", {
+    method: "POST",
+    body: JSON.stringify({ name, files, session, host, port }),
+  })
+}
+
+export async function comboBat(
+  combo: string,
+  session: string,
+  mode: "solo" | "group",
+): Promise<BatResult> {
+  return request<BatResult>("/api/combo/bat", {
+    method: "POST",
+    body: JSON.stringify({ combo, session, mode }),
+  })
+}

@@ -8,6 +8,7 @@ import {
   EyeOff,
   FileCode2,
   FolderCog,
+  Plug,
   Highlighter,
   Keyboard,
   Loader2,
@@ -55,8 +56,16 @@ import { NotesView } from "@/components/notes-view"
 import { StatsView } from "@/components/stats-view"
 import { ReferencePanel } from "@/components/reference-panel"
 import { FilesView } from "@/components/files-view"
+import { ComboView } from "@/components/combo-view"
 
-type ViewId = TableType | "presets" | "notes" | "raw" | "stats" | "files"
+type ViewId =
+  | TableType
+  | "presets"
+  | "notes"
+  | "raw"
+  | "stats"
+  | "files"
+  | "combo"
 
 const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "action", label: "자반", icon: Zap },
@@ -72,6 +81,7 @@ const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "notes", label: "정보 저장소", icon: BookText },
   { id: "stats", label: "통계", icon: BarChart3 },
   { id: "files", label: "파일 관리", icon: FolderCog },
+  { id: "combo", label: "접속 빌더", icon: Plug },
   { id: "raw", label: "Raw 편집", icon: FileCode2 },
 ]
 
@@ -208,7 +218,11 @@ export default function App() {
   }
 
   const usesFile =
-    view !== "presets" && view !== "notes" && view !== "stats" && view !== "files"
+    view !== "presets" &&
+    view !== "notes" &&
+    view !== "stats" &&
+    view !== "files" &&
+    view !== "combo"
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
@@ -381,6 +395,7 @@ export default function App() {
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView />}
+          {view === "combo" && <ComboView />}
 
           {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
           {showRef && <ReferencePanel onClose={() => setShowRef(false)} />}
