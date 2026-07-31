@@ -466,6 +466,16 @@ export interface ComboIssue {
   message: string
 }
 
+export type SessionMode = "file" | "builder"
+
+export interface ComboSession {
+  file: string
+  line: number
+  name: string
+  host: string
+  port: string
+}
+
 export interface ComboValidation {
   ok: boolean
   level: "success" | "warning" | "error"
@@ -473,6 +483,10 @@ export interface ComboValidation {
   errors: ComboIssue[]
   warnings: ComboIssue[]
   summary: string
+  session_mode: SessionMode
+  sessions: ComboSession[]
+  /** "파일에 세션 있음" 으로 통과했을 때 쓰일 세션 이름 */
+  session_name: string | null
 }
 
 export interface ComboSources {
@@ -486,6 +500,7 @@ export interface ComboResult {
   session: string
   host: string
   port: string
+  session_mode: SessionMode
   files: string[]
   size: number
   content: string
@@ -506,10 +521,13 @@ export async function comboSources(): Promise<ComboSources> {
   return request<ComboSources>("/api/combo/sources")
 }
 
-export async function comboValidate(files: string[]): Promise<ComboValidation> {
+export async function comboValidate(
+  files: string[],
+  sessionMode: SessionMode,
+): Promise<ComboValidation> {
   return request<ComboValidation>("/api/combo/validate", {
     method: "POST",
-    body: JSON.stringify({ files }),
+    body: JSON.stringify({ files, session_mode: sessionMode }),
   })
 }
 
@@ -519,10 +537,11 @@ export async function comboCreate(
   session: string,
   host: string,
   port: string,
+  sessionMode: SessionMode,
 ): Promise<ComboResult> {
   return request<ComboResult>("/api/combo/create", {
     method: "POST",
-    body: JSON.stringify({ name, files, session, host, port }),
+    body: JSON.stringify({ name, files, session, host, port, session_mode: sessionMode }),
   })
 }
 

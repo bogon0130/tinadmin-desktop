@@ -18,6 +18,7 @@ import {
   comboValidate,
   type ComboResult,
   type ComboValidation,
+  type SessionMode,
 } from "@/lib/api"
 
 /** 파일 relpath 를 폴더별로 묶는다 */
@@ -58,6 +59,9 @@ export function ComboView() {
   const [host, setHost] = useState("ggai.tv")
   const [port, setPort] = useState("4000")
   const [mode, setMode] = useState<"solo" | "group">("solo")
+  // 세션을 누가 만드느냐. 기본은 "파일에 있는 걸 쓴다" —
+  // 캐릭터 tin 은 대개 자기 #session 을 갖고 있어서, 빌더가 또 만들면 ALREADY 오류가 난다.
+  const [sessionMode, setSessionMode] = useState<SessionMode>("file")
 
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
@@ -87,6 +91,12 @@ export function ComboView() {
 
   const groups = useMemo(() => groupByDir(sources), [sources])
 
+  function changeSessionMode(m: SessionMode) {
+    setSessionMode(m)
+    setResult(null)   // 판정 기준이 달라지므로 검증 결과를 버린다
+    setCombo(null)
+  }
+
   function toggle(f: string) {
     setPicked((p) => (p.includes(f) ? p.filter((x) => x !== f) : [...p, f]))
     setResult(null)
@@ -113,7 +123,7 @@ export function ComboView() {
     }
     setChecking(true)
     try {
-      const v = await comboValidate(picked)
+      const v = await comboValidate(picked, sessionMode)
       setResult(v)
       if (v.level === "success") toast.success("검증 통과")
       else if (v.level === "warning")
@@ -129,7 +139,9 @@ export function ComboView() {
   async function handleCreate() {
     setCreating(true)
     try {
-      const c = await comboCreate(comboName.trim(), picked, session.trim(), host, port)
+      const c = await comboCreate(
+        comboName.trim(), picked, session.trim(), host, port, sessionMode,
+      )
       setCombo(c)
       toast.success(`✅ 조합 만듦 — ${c.name}`, {
         description: "⚠️ 게임엔 미반영. 받은 .bat 으로 접속하세요.",
@@ -165,8 +177,11 @@ export function ComboView() {
     }
   }
 
+  // "파일에 세션 있음" 이면 세션 이름을 입력받지 않는다 — 검증이 파일에서 찾아준다.
   const canCreate =
-    result?.ok === true && comboName.trim() !== "" && session.trim() !== ""
+    result?.ok === true &&
+    comboName.trim() !== "" &&
+    (sessionMode === "file" ? !!result.session_name : session.trim() !== "")
 
   const inputCls =
     "tin-mono rounded-md border bg-transparent px-3 py-1.5 outline-none focus:border-[var(--tin-accent)]"
@@ -308,6 +323,53 @@ export function ComboView() {
 
         {/* 설정 */}
         <p className="hud-sect">SESSION · 접속 설정</p>
+
+        {/* 세션 처리 방식 — 이걸 잘못 고르면 세션이 둘이 되어 ALREADY 오류가 난다 */}
+        <div
+          className="mb-3 rounded-md border p-3"
+          style={{ borderColor: "var(--tin-edge)", background: "var(--tin-panel2)" }}
+        >
+          <p className="mb-2" style={{ fontSize: "var(--tin-fs-sm)", color: "var(--tin-accent)" }}>
+            세션 처리 방식
+          </p>
+          {(
+            [
+              {
+                v: "file" as const,
+                t: "파일에 세션 있음 (기본)",
+                d: "고른 파일 안의 #session 을 그대로 쓴다. 빌더는 #config + #read 만 만든다.",
+              },
+              {
+                v: "builder" as const,
+                t: "빌더가 세션 생성",
+                d: "빌더가 위에 #session {이름} {서버} {포트} 를 넣는다. 파일에 #session 이 없을 때 쓴다.",
+              },
+            ]
+          ).map((o) => (
+            <label
+              key={o.v}
+              className="flex cursor-pointer items-start gap-2 py-1"
+              style={{ fontSize: "var(--tin-fs-sm)" }}
+            >
+              <input
+                type="radio"
+                name="session-mode"
+                checked={sessionMode === o.v}
+                onChange={() => changeSessionMode(o.v)}
+                className="mt-0.5 accent-[var(--tin-accent)]"
+              />
+              <span>
+                <span style={{ color: sessionMode === o.v ? "var(--tin-accent)" : undefined }}>
+                  {o.t}
+                </span>
+                <span className="block" style={{ opacity: 0.65 }}>
+                  {o.d}
+                </span>
+              </span>
+            </label>
+          ))}
+        </div>
+
         <div className="mb-4 grid gap-2 sm:grid-cols-2">
           <label style={{ fontSize: "var(--tin-fs-sm)" }}>
             조합 이름 (파일명)
@@ -319,34 +381,55 @@ export function ComboView() {
               style={inputStyle}
             />
           </label>
-          <label style={{ fontSize: "var(--tin-fs-sm)" }}>
-            세션 이름
-            <input
-              value={session}
-              onChange={(e) => setSession(e.target.value)}
-              placeholder="담신우"
-              className={`${inputCls} mt-1 w-full`}
-              style={inputStyle}
-            />
-          </label>
-          <label style={{ fontSize: "var(--tin-fs-sm)" }}>
-            게임 서버
-            <input
-              value={host}
-              onChange={(e) => setHost(e.target.value)}
-              className={`${inputCls} mt-1 w-full`}
-              style={inputStyle}
-            />
-          </label>
-          <label style={{ fontSize: "var(--tin-fs-sm)" }}>
-            포트
-            <input
-              value={port}
-              onChange={(e) => setPort(e.target.value.replace(/[^\d]/g, ""))}
-              className={`${inputCls} mt-1 w-full`}
-              style={inputStyle}
-            />
-          </label>
+
+          {sessionMode === "builder" ? (
+            <>
+              <label style={{ fontSize: "var(--tin-fs-sm)" }}>
+                세션 이름
+                <input
+                  value={session}
+                  onChange={(e) => setSession(e.target.value)}
+                  placeholder="담신우"
+                  className={`${inputCls} mt-1 w-full`}
+                  style={inputStyle}
+                />
+              </label>
+              <label style={{ fontSize: "var(--tin-fs-sm)" }}>
+                게임 서버
+                <input
+                  value={host}
+                  onChange={(e) => setHost(e.target.value)}
+                  className={`${inputCls} mt-1 w-full`}
+                  style={inputStyle}
+                />
+              </label>
+              <label style={{ fontSize: "var(--tin-fs-sm)" }}>
+                포트
+                <input
+                  value={port}
+                  onChange={(e) => setPort(e.target.value.replace(/[^\d]/g, ""))}
+                  className={`${inputCls} mt-1 w-full`}
+                  style={inputStyle}
+                />
+              </label>
+            </>
+          ) : (
+            /* 파일이 세션을 갖고 있으므로 입력칸을 숨기고, 검증이 찾아낸 세션을 보여준다 */
+            <div style={{ fontSize: "var(--tin-fs-sm)" }}>
+              세션 (파일에서 가져옴)
+              <div
+                className="tin-mono mt-1 w-full rounded-md border px-3 py-1.5"
+                style={{
+                  borderColor: "var(--tin-edge)",
+                  opacity: result?.session_name ? 1 : 0.55,
+                }}
+              >
+                {result?.session_name
+                  ? `#session {${result.session_name}}  ← ${result.sessions[0]?.file}:${result.sessions[0]?.line}`
+                  : "검증하면 여기에 표시됩니다"}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="mb-4 flex flex-wrap items-center gap-2">
