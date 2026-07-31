@@ -2,17 +2,21 @@ import { useCallback, useEffect, useMemo, useState } from "react"
 import {
   AlertTriangle,
   CheckCircle2,
+  Copy,
   Download,
   FileCheck2,
+  PlugZap,
   GripVertical,
   Loader2,
   RefreshCw,
   XCircle,
 } from "lucide-react"
+import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 
 import {
   comboBat,
+  comboConnect,
   comboCreate,
   comboSources,
   comboValidate,
@@ -41,9 +45,12 @@ const baseOf = (f: string) => {
 /**
  * 접속 조합 빌더.
  *
- * tin 여러 개를 골라 순서를 정하고 -> 검증 -> 조합 파일 생성 -> .bat 다운로드.
+ * tin 여러 개를 골라 순서를 정하고 -> 검증 -> 조합 파일 생성 -> 접속.
  * 서버는 조합 파일을 만들 뿐 tmux 로 아무것도 보내지 않는다.
- * 실제 접속은 받은 .bat 이 ssh 로 들어가서 한다.
+ *
+ * 접속은 두 갈래다.
+ *   [단독/그룹 접속] 이 PC 가 새 터미널 창을 띄워 ssh 로 붙는다 (Rust open_terminal)
+ *   [.bat 다운로드]  파일로 받아 직접 실행 — 예전 방식도 그대로 남겨둔다
  */
 export function ComboView() {
   const [sources, setSources] = useState<string[]>([])
@@ -69,6 +76,8 @@ export function ComboView() {
   const [result, setResult] = useState<ComboValidation | null>(null)
   const [combo, setCombo] = useState<ComboResult | null>(null)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
+  const [connecting, setConnecting] = useState<"solo" | "group" | null>(null)
+  const [preview, setPreview] = useState<{ solo: string; group: string } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -95,12 +104,14 @@ export function ComboView() {
     setSessionMode(m)
     setResult(null)   // 판정 기준이 달라지므로 검증 결과를 버린다
     setCombo(null)
+    setPreview(null)
   }
 
   function toggle(f: string) {
     setPicked((p) => (p.includes(f) ? p.filter((x) => x !== f) : [...p, f]))
     setResult(null)
     setCombo(null)
+    setPreview(null)   // 조합이 바뀌면 명령 미리보기도 버린다
   }
 
   /** 순서 바꾸기 — 드래그로 위/아래 이동 */
@@ -114,6 +125,7 @@ export function ComboView() {
     })
     setResult(null)
     setCombo(null)
+    setPreview(null)   // 조합이 바뀌면 명령 미리보기도 버린다
   }
 
   async function handleValidate() {
@@ -143,6 +155,7 @@ export function ComboView() {
         comboName.trim(), picked, session.trim(), host, port, sessionMode,
       )
       setCombo(c)
+      void loadPreview(c)
       toast.success(`✅ 조합 만듦 — ${c.name}`, {
         description: "⚠️ 게임엔 미반영. 받은 .bat 으로 접속하세요.",
       })
@@ -154,6 +167,62 @@ export function ComboView() {
       setCreating(false)
     }
   }
+
+  /**
+   * 새 터미널 창을 띄워 조합에 접속한다.
+   *
+   * 서버는 명령 재료(접속대상 + 원격명령)만 내려주고 ssh 를 실행하지 않는다.
+   * 실행은 이 PC 의 Rust 쪽 open_terminal 이 새 콘솔 창을 띄워서 한다.
+   */
+  async function connect(m: "solo" | "group") {
+    if (!combo) return
+    setConnecting(m)
+    try {
+      const info = await comboConnect(combo.combo, combo.session, m)
+      const ran = await invoke<string>("open_terminal", {
+        target: info.ssh_target,
+        remote: info.remote,
+        title: `${combo.session} ${m === "group" ? "그룹" : "단독"} — tinadmin`,
+      })
+      console.info("[접속] ", ran)
+      toast.success(`🖥️ 새 터미널 창을 열었습니다 (${m === "group" ? "그룹" : "단독"})`, {
+        description: info.description,
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      toast.error("접속 실패", {
+        description: msg.includes("open_terminal")
+          ? "앱(데스크톱)에서만 접속 버튼을 쓸 수 있습니다. .bat 을 받아 실행해 주세요."
+          : msg,
+      })
+    } finally {
+      setConnecting(null)
+    }
+  }
+
+  async function copyBat(m: "solo" | "group") {
+    if (!combo) return
+    try {
+      const b = await comboBat(combo.combo, combo.session, m)
+      await navigator.clipboard.writeText(b.content)
+      toast.success(`📋 ${b.filename} 내용을 복사했습니다`)
+    } catch (e) {
+      toast.error("복사 실패", { description: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  /** 화면에 보여줄 .bat 명령 미리보기 (생성 직후 두 모드 다 받아둔다) */
+  const loadPreview = useCallback(async (c: ComboResult) => {
+    try {
+      const [solo, group] = await Promise.all([
+        comboConnect(c.combo, c.session, "solo"),
+        comboConnect(c.combo, c.session, "group"),
+      ])
+      setPreview({ solo: solo.display, group: group.display })
+    } catch {
+      setPreview(null)
+    }
+  }, [])
 
   async function downloadBat(m: "solo" | "group") {
     if (!combo) return
@@ -182,6 +251,9 @@ export function ComboView() {
     result?.ok === true &&
     comboName.trim() !== "" &&
     (sessionMode === "file" ? !!result.session_name : session.trim() !== "")
+
+  // 요구사항 5: 검증을 통과하고 조합이 만들어진 상태에서만 접속할 수 있다
+  const canConnect = !!combo && result?.ok === true
 
   const inputCls =
     "tin-mono rounded-md border bg-transparent px-3 py-1.5 outline-none focus:border-[var(--tin-accent)]"
@@ -549,6 +621,91 @@ export function ComboView() {
               </pre>
             </div>
 
+            {/* 접속 — 새 터미널 창을 띄운다 */}
+            <p className="hud-sect">CONNECT · 바로 접속</p>
+            <div className="mb-3 flex flex-wrap gap-2">
+              {(["solo", "group"] as const).map((m) => (
+                <button
+                  key={m}
+                  onClick={() => void connect(m)}
+                  disabled={!canConnect || connecting !== null}
+                  title={
+                    canConnect
+                      ? undefined
+                      : "검증을 통과한 조합만 접속할 수 있습니다."
+                  }
+                  className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 disabled:opacity-40"
+                  style={{
+                    borderColor: "var(--tin-accent)",
+                    color: "var(--tin-accent)",
+                    fontSize: "var(--tin-fs-sm)",
+                  }}
+                >
+                  {connecting === m ? (
+                    <Loader2 className="size-3.5 animate-spin" />
+                  ) : (
+                    <PlugZap className="size-3.5" />
+                  )}
+                  {m === "solo" ? "단독 접속" : "그룹 접속"}
+                </button>
+              ))}
+              <span
+                className="self-center"
+                style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}
+              >
+                새 터미널 창이 열립니다. 그룹은 {defaults.tmux_session} 에 창만 추가합니다.
+              </span>
+            </div>
+
+            {/* 실행될 명령 — 직접 붙여 쓰고 싶은 사람을 위해 그대로 보여준다 */}
+            {preview && (
+              <div className="mb-3 grid gap-2">
+                {(["solo", "group"] as const).map((m) => (
+                  <div key={m}>
+                    <div
+                      className="mb-1 flex items-center gap-2"
+                      style={{ fontSize: "var(--tin-fs-sm)" }}
+                    >
+                      <span style={{ opacity: 0.7 }}>
+                        {m === "solo" ? "단독" : "그룹"} 명령
+                      </span>
+                      <button
+                        onClick={() => {
+                          void navigator.clipboard.writeText(preview[m])
+                          toast.success("📋 명령을 복사했습니다")
+                        }}
+                        className="flex items-center gap-1 rounded border px-1.5"
+                        style={{ borderColor: "var(--tin-edge)" }}
+                      >
+                        <Copy className="size-3" />
+                        복사
+                      </button>
+                      <button
+                        onClick={() => void copyBat(m)}
+                        className="flex items-center gap-1 rounded border px-1.5"
+                        style={{ borderColor: "var(--tin-edge)" }}
+                      >
+                        <Copy className="size-3" />
+                        .bat 내용 복사
+                      </button>
+                    </div>
+                    <pre
+                      className="tin-mono tin-scroll overflow-x-auto rounded-md border p-2"
+                      style={{
+                        borderColor: "var(--tin-edge)",
+                        background: "var(--tin-panel2)",
+                        whiteSpace: "pre",
+                        fontSize: "var(--tin-fs-sm)",
+                      }}
+                    >
+                      {preview[m]}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* .bat 파일로도 받을 수 있게 병행 유지 */}
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => void downloadBat("solo")}

@@ -509,6 +509,17 @@ export interface ComboResult {
   note: string
 }
 
+/** 앱이 새 터미널을 띄울 때 쓰는 재료. 서버 주소/계정은 서버 config(.env)에서 온다. */
+export interface ConnectInfo {
+  mode: "solo" | "group"
+  ssh_target: string
+  remote: string
+  description: string
+  combo_path: string
+  /** 화면에 보여줄 전체 명령 */
+  display: string
+}
+
 export interface BatResult {
   mode: string
   filename: string
@@ -542,6 +553,17 @@ export async function comboCreate(
   return request<ComboResult>("/api/combo/create", {
     method: "POST",
     body: JSON.stringify({ name, files, session, host, port, session_mode: sessionMode }),
+  })
+}
+
+export async function comboConnect(
+  combo: string,
+  session: string,
+  mode: "solo" | "group",
+): Promise<ConnectInfo> {
+  return request<ConnectInfo>("/api/combo/connect", {
+    method: "POST",
+    body: JSON.stringify({ combo, session, mode }),
   })
 }
 
