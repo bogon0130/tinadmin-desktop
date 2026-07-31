@@ -25,5 +25,7 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src"],
+  /* 테스트는 bun 런타임(bun:test)에서 돌리므로 앱 빌드 대상에서 제외한다 */
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }

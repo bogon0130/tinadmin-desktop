@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Copy,
   Download,
+  Star,
   FileCheck2,
   PlugZap,
   GripVertical,
@@ -24,6 +25,17 @@ import {
   type ComboValidation,
   type SessionMode,
 } from "@/lib/api"
+import {
+  allFolders,
+  loadFavorites,
+  newId,
+  saveFavorites,
+  upsertItem,
+  validName,
+  EMPTY_STORE,
+  type ConnectMode,
+  type FavStore,
+} from "@/lib/favorites"
 
 /** 파일 relpath 를 폴더별로 묶는다 */
 function groupByDir(files: string[]) {
@@ -52,7 +64,7 @@ const baseOf = (f: string) => {
  *   [단독/그룹 접속] 이 PC 가 새 터미널 창을 띄워 ssh 로 붙는다 (Rust open_terminal)
  *   [.bat 다운로드]  파일로 받아 직접 실행 — 예전 방식도 그대로 남겨둔다
  */
-export function ComboView() {
+export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void }) {
   const [sources, setSources] = useState<string[]>([])
   const [defaults, setDefaults] = useState({
     host: "ggai.tv",
@@ -78,6 +90,14 @@ export function ComboView() {
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [connecting, setConnecting] = useState<"solo" | "group" | null>(null)
   const [preview, setPreview] = useState<{ solo: string; group: string } | null>(null)
+  // 즐겨찾기 저장 폼
+  const [favOpen, setFavOpen] = useState(false)
+  const [favStore, setFavStore] = useState<FavStore>(EMPTY_STORE)
+  const [favName, setFavName] = useState("")
+  const [favFolder, setFavFolder] = useState("")
+  const [favNewFolder, setFavNewFolder] = useState("")
+  const [favMode, setFavMode] = useState<ConnectMode>("solo")
+  const [favSaving, setFavSaving] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -197,6 +217,65 @@ export function ComboView() {
       })
     } finally {
       setConnecting(null)
+    }
+  }
+
+  async function openFavForm() {
+    if (!combo) return
+    try {
+      const { store } = await loadFavorites()
+      setFavStore(store)
+    } catch {
+      setFavStore(EMPTY_STORE)
+    }
+    setFavName(combo.combo)
+    setFavMode(mode)
+    setFavOpen(true)
+  }
+
+  async function saveFavorite() {
+    if (!combo) return
+    const folder = (favNewFolder.trim() || favFolder).trim()
+    const badName = validName(favName)
+    if (badName) {
+      toast.error(badName)
+      return
+    }
+    if (favNewFolder.trim()) {
+      const badFolder = validName(favNewFolder)
+      if (badFolder) {
+        toast.error(badFolder)
+        return
+      }
+    }
+    setFavSaving(true)
+    try {
+      const next = upsertItem(favStore, {
+        id: newId(),
+        name: favName.trim(),
+        combo: combo.combo,
+        files: picked,          // 고른 순서 그대로 = #read 순서
+        session: combo.session,
+        host: combo.host ?? host,
+        port: combo.port ?? port,
+        sessionMode,
+        mode: favMode,
+        folder,
+        createdAt: new Date().toISOString().slice(0, 10),
+      })
+      await saveFavorites(next)
+      setFavOpen(false)
+      setFavNewFolder("")
+      toast.success(`⭐ 즐겨찾기에 저장했습니다 — ${favName.trim()}`, {
+        description: `${folder || "최상위"} · ${favMode === "group" ? "그룹" : "단독"} 접속`,
+      })
+      onFavoriteSaved?.()
+    } catch (e) {
+      toast.error("즐겨찾기 저장 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setFavSaving(false)
     }
   }
 
@@ -704,6 +783,112 @@ export function ComboView() {
                 ))}
               </div>
             )}
+
+            {/* 즐겨찾기 저장 — 검증 통과 + 조합 생성 상태에서만 */}
+            <div className="mb-3">
+              <button
+                onClick={() => void openFavForm()}
+                disabled={!canConnect}
+                title={canConnect ? undefined : "검증을 통과한 조합만 저장할 수 있습니다."}
+                className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 disabled:opacity-40"
+                style={{
+                  borderColor: "var(--tin-accent)",
+                  color: "var(--tin-accent)",
+                  fontSize: "var(--tin-fs-sm)",
+                }}
+              >
+                <Star className="size-3.5" />
+                즐겨찾기에 저장
+              </button>
+
+              {favOpen && (
+                <div
+                  className="mt-2 grid gap-2 rounded-md border p-3 sm:grid-cols-2"
+                  style={{ borderColor: "var(--tin-edge)", background: "var(--tin-panel2)" }}
+                >
+                  <label style={{ fontSize: "var(--tin-fs-sm)" }}>
+                    즐겨찾기 이름
+                    <input
+                      value={favName}
+                      onChange={(e) => setFavName(e.target.value)}
+                      className={`${inputCls} mt-1 w-full`}
+                      style={inputStyle}
+                    />
+                  </label>
+
+                  <label style={{ fontSize: "var(--tin-fs-sm)" }}>
+                    폴더 (없으면 최상위)
+                    <select
+                      value={favFolder}
+                      onChange={(e) => setFavFolder(e.target.value)}
+                      disabled={favNewFolder.trim() !== ""}
+                      className={`${inputCls} mt-1 w-full disabled:opacity-40`}
+                      style={inputStyle}
+                    >
+                      <option value="">— 최상위 —</option>
+                      {allFolders(favStore).map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label style={{ fontSize: "var(--tin-fs-sm)" }}>
+                    새 폴더 만들기 (선택)
+                    <input
+                      value={favNewFolder}
+                      onChange={(e) => setFavNewFolder(e.target.value)}
+                      placeholder="비워두면 위에서 고른 폴더"
+                      className={`${inputCls} mt-1 w-full`}
+                      style={inputStyle}
+                    />
+                  </label>
+
+                  <div style={{ fontSize: "var(--tin-fs-sm)" }}>
+                    접속 방식 (저장 시점에 고정)
+                    <div className="mt-1 flex gap-2">
+                      {(["solo", "group"] as const).map((m) => (
+                        <button
+                          key={m}
+                          onClick={() => setFavMode(m)}
+                          className="flex-1 rounded-md border px-2 py-1.5"
+                          style={{
+                            borderColor: favMode === m ? "var(--tin-accent)" : "var(--tin-edge)",
+                            color: favMode === m ? "var(--tin-accent)" : "var(--tin-fg)",
+                          }}
+                        >
+                          {m === "solo" ? "단독" : "그룹"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 sm:col-span-2">
+                    <button
+                      onClick={() => void saveFavorite()}
+                      disabled={favSaving}
+                      className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 disabled:opacity-50"
+                      style={{
+                        borderColor: "var(--tin-accent)",
+                        color: "var(--tin-accent)",
+                        fontSize: "var(--tin-fs-sm)",
+                      }}
+                    >
+                      {favSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Star className="size-3.5" />}
+                      저장
+                    </button>
+                    <button
+                      onClick={() => setFavOpen(false)}
+                      className="rounded-md border px-3 py-1.5"
+                      style={{ borderColor: "var(--tin-edge)", fontSize: "var(--tin-fs-sm)" }}
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* .bat 파일로도 받을 수 있게 병행 유지 */}
             <div className="flex flex-wrap gap-2">

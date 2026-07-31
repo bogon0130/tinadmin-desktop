@@ -49,6 +49,7 @@ import {
 import type { TableType, TinEntry } from "@/lib/types"
 import { LoginScreen } from "@/components/login-screen"
 import { EntryTable } from "@/components/entry-table"
+import { FavoritesPanel } from "@/components/favorites-panel"
 import { Cheatsheet } from "@/components/cheatsheet"
 import { RawView } from "@/components/raw-view"
 import { PresetsView } from "@/components/presets-view"
@@ -92,6 +93,8 @@ function isTableType(v: ViewId): v is TableType {
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()))
   const [view, setView] = useState<ViewId>("action")
+  // 즐겨찾기가 추가되면 이 값을 올려 사이드바를 다시 읽게 한다
+  const [favReload, setFavReload] = useState(0)
   // 표 화면 파일 선택기 목록 — 서버에서 받는다(하드코딩 제거).
   // /api/load 가 다룰 수 있는 파일만 담는다 (table_editable=true)
   const [tableFiles, setTableFiles] = useState<string[]>([])
@@ -259,6 +262,9 @@ export default function App() {
               </button>
             )
           })}
+
+          {/* 즐겨찾기 — 클릭 한 번으로 저장된 방식대로 접속한다 */}
+          <FavoritesPanel reloadKey={favReload} />
         </div>
 
         <div className="border-t border-sidebar-border p-2">
@@ -395,7 +401,7 @@ export default function App() {
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView />}
-          {view === "combo" && <ComboView />}
+          {view === "combo" && <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />}
 
           {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
           {showRef && <ReferencePanel onClose={() => setShowRef(false)} />}

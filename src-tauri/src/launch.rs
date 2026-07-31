@@ -62,22 +62,37 @@ fn safe_title(t: &str) -> String {
     }
 }
 
+/// PowerShell 문자열 안에 넣기 위한 홑따옴표 이스케이프.
+///
+/// PowerShell 의 '작은따옴표 문자열' 안에서 작은따옴표는 두 번 써서 표현한다.
+/// 그룹 접속 명령이 tmux 인자를 '홑따옴표'로 감싸고 있어서 이 처리가 반드시 필요하다.
+pub fn ps_quote(s: &str) -> String {
+    s.replace('\'', "''")
+}
+
 /// 윈도우 명령줄 조립 (cmd.exe 에 그대로 넘길 문자열).
 ///
-///   /c start "제목" cmd /k ssh -t 계정@호스트 "원격명령"
+///   /c start "제목" powershell -NoExit -Command "chcp 65001 > $null; ssh -t 대상 '원격명령'"
 ///
-/// start   : 새 콘솔 창을 띄운다. 첫 따옴표 토큰을 창 제목으로 먹으므로 반드시 준다.
-/// cmd /k  : ssh 가 끝나도 창을 닫지 않는다 — 접속이 실패해도 사용자가 이유를 볼 수 있다.
+/// start       : 새 창을 띄운다. 첫 따옴표 토큰을 창 제목으로 먹으므로 반드시 준다.
+/// powershell  : 요구대로 새 PowerShell 창에서 실행한다.
+/// -NoExit     : ssh 가 끝나도 창을 닫지 않는다 — 접속이 실패해도 이유를 볼 수 있다.
+/// chcp 65001  : 한글이 깨지지 않게 UTF-8 코드페이지로 맞춘다.
+///
+/// ★따옴표 설계★
+///   바깥(cmd)은 겹따옴표, 안쪽(PowerShell)은 홑따옴표만 쓴다.
+///   원격 명령에는 겹따옴표가 못 들어오게 막아두었고(check_remote),
+///   원래 들어있는 홑따옴표는 ps_quote 로 '' 로 바꾼다. 두 층이 겹치지 않는다.
 pub fn build_windows_cmdline(target: &str, remote: &str, title: &str) -> Result<String, String> {
     if !valid_target(target) {
         return Err(format!("접속 대상 형식이 올바르지 않습니다: {}", target));
     }
     check_remote(remote)?;
     Ok(format!(
-        "/c start \"{}\" cmd /k ssh -t {} \"{}\"",
+        "/c start \"{}\" powershell -NoExit -Command \"chcp 65001 > $null; ssh -t {} '{}'\"",
         safe_title(title),
         target,
-        remote
+        ps_quote(remote)
     ))
 }
 
@@ -152,26 +167,48 @@ mod tests {
         let line = build_windows_cmdline(T, SOLO, "담신우 단독").unwrap();
         assert_eq!(
             line,
-            "/c start \"담신우 단독\" cmd /k ssh -t kimbogon@192.168.219.157 \
-             \"cd /home/kimbogon/projects/goblin && tt++ tin/_combos/담신우조합.tin\""
+            "/c start \"담신우 단독\" powershell -NoExit -Command \
+             \"chcp 65001 > $null; ssh -t kimbogon@192.168.219.157 \
+             'cd /home/kimbogon/projects/goblin && tt++ tin/_combos/담신우조합.tin'\""
         );
     }
 
     #[test]
     fn 그룹_명령줄_조립() {
         let line = build_windows_cmdline(T, GROUP, "담신우 그룹").unwrap();
-        // 겹따옴표는 제목 2개 + 원격명령 2개 = 정확히 4개여야 한다.
+        // 겹따옴표는 제목 2개 + -Command 인자 2개 = 정확히 4개.
         assert_eq!(line.matches('"').count(), 4, "따옴표 개수: {}", line);
-        // 홑따옴표로 감싼 안쪽은 그대로 살아 있어야 한다.
-        assert!(line.contains("'cd /home/kimbogon/projects/goblin && tt++ tin/_combos/담신우조합.tin'"));
+        // 원격 명령 안의 홑따옴표는 PowerShell 규칙대로 두 개로 늘어나야 한다.
+        assert!(
+            line.contains("''cd /home/kimbogon/projects/goblin && tt++ tin/_combos/담신우조합.tin''"),
+            "홑따옴표 이스케이프 실패: {}",
+            line
+        );
         assert!(line.contains("tmux new-window -t goblin -n 담신우"));
-        assert!(line.ends_with("&& tmux attach -t goblin\""));
+        assert!(line.ends_with("&& tmux attach -t goblin'\""));
+        assert!(line.contains("chcp 65001"));
+        assert!(line.contains("powershell -NoExit"));
+    }
+
+    #[test]
+    fn 홑따옴표_이스케이프() {
+        assert_eq!(ps_quote("a'b"), "a''b");
+        assert_eq!(ps_quote("'x'"), "''x''");
+        assert_eq!(ps_quote("따옴표 없음"), "따옴표 없음");
+    }
+
+    /// PowerShell 이 실제로 어떻게 되돌려 읽는지 흉내내어, 원본 명령이 복원되는지 본다.
+    #[test]
+    fn 이스케이프_왕복() {
+        for orig in [SOLO, GROUP, "a 'b' c", "''"] {
+            let 복원 = ps_quote(orig).replace("''", "'");
+            assert_eq!(복원, orig, "왕복 실패: {}", orig);
+        }
     }
 
     #[test]
     fn 그룹은_기존창을_건드리지_않는다() {
         let line = build_windows_cmdline(T, GROUP, "x").unwrap();
-        // new-window(추가)만 쓰고, 창을 죽이거나 갈아타는 명령이 없어야 한다.
         assert!(line.contains("tmux new-window"));
         for 금지 in ["kill-window", "kill-session", "kill-server", "respawn", "send-keys"] {
             assert!(!line.contains(금지), "위험한 명령 발견: {}", 금지);
@@ -206,28 +243,20 @@ mod tests {
     #[test]
     fn 잘못된_접속대상_거부() {
         for bad in [
-            "kimbogon",                    // @ 없음
-            "@192.168.219.157",            // 계정 없음
-            "kimbogon@",                   // 호스트 없음
-            "kimbogon@host;rm -rf /",      // 세미콜론
-            "kim bogon@host",              // 공백
-            "kimbogon@host\"",             // 따옴표
+            "kimbogon",
+            "@192.168.219.157",
+            "kimbogon@",
+            "kimbogon@host;rm -rf /",
+            "kim bogon@host",
+            "kimbogon@host\"",
         ] {
-            assert!(
-                build_windows_cmdline(bad, SOLO, "x").is_err(),
-                "막혔어야 함: {}",
-                bad
-            );
+            assert!(build_windows_cmdline(bad, SOLO, "x").is_err(), "막혔어야 함: {}", bad);
         }
     }
 
     #[test]
     fn 정상_접속대상_통과() {
-        for good in [
-            "kimbogon@192.168.219.157",
-            "user_1@my-host.example.com",
-            "a@b",
-        ] {
+        for good in ["kimbogon@192.168.219.157", "user_1@my-host.example.com", "a@b"] {
             assert!(build_windows_cmdline(good, SOLO, "x").is_ok(), "통과해야 함: {}", good);
         }
     }
@@ -242,7 +271,6 @@ mod tests {
     fn 유닉스_인자조립() {
         let a = build_unix_argv(T, SOLO).unwrap();
         assert_eq!(a, vec!["ssh", "-t", T, SOLO]);
-        // 셸을 거치지 않고 인자 배열로 넘기므로 따옴표 문제가 없다
         assert!(build_unix_argv(T, "evil\"cmd").is_err());
     }
 }

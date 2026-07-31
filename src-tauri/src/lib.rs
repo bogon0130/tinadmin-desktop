@@ -1,3 +1,4 @@
+mod favorites;
 mod launch;
 
 use tauri::webview::PageLoadEvent;
@@ -52,7 +53,13 @@ pub fn run() {
         )
         .plugin(tauri_plugin_opener::init())
         .plugin(external_navigation_plugin())
-        .invoke_handler(tauri::generate_handler![greet, launch::open_terminal])
+        .invoke_handler(tauri::generate_handler![
+            greet,
+            launch::open_terminal,
+            favorites::favorites_load,
+            favorites::favorites_save,
+            favorites::favorites_path,
+        ])
         .on_page_load(|webview, payload| {
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {
                 log::info!("main webview finished loading");
