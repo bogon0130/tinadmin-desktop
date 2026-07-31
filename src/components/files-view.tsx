@@ -28,6 +28,8 @@ import {
   deleteDir,
   deleteTinFile,
   listTinTree,
+  moveCheck,
+  moveTinFile,
   readParsed,
   readTinFile,
   renameTinFile,
@@ -35,6 +37,7 @@ import {
   saveTinFile,
   type ParsedFile,
   type TinFileContent,
+  type MoveCheck,
   type TinFileMeta,
 } from "@/lib/api"
 import { EntryTable } from "@/components/entry-table"
@@ -52,6 +55,7 @@ import {
   type SnippetForm,
 } from "@/lib/snippets"
 import { SnippetFormDialog } from "@/components/snippet-form"
+import { MoveWarnDialog } from "@/components/move-dialog"
 
 /** 실행 중 세션이 쓰는 파일 → 창 이름 (서버 config.FILE_TARGETS 와 같은 내용) */
 const IN_USE = new Map<string, string[]>([
@@ -83,6 +87,11 @@ export function FilesView() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   // [새 파일] 을 누를 때 어느 폴더에 만들지 ('' = 최상위)
   const [targetDir, setTargetDir] = useState("")
+  // 드래그 중인 파일 / 드롭 대상 폴더 하이라이트
+  const [dragFile, setDragFile] = useState<string | null>(null)
+  const [dropDir, setDropDir] = useState<string | null>(null)
+  // 참조당하는 파일을 옮기려 할 때 뜨는 경고
+  const [moveWarn, setMoveWarn] = useState<{ check: MoveCheck; to: string } | null>(null)
   const [current, setCurrent] = useState<TinFileContent | null>(null)
   const [draft, setDraft] = useState("")
   const [loadingList, setLoadingList] = useState(true)
@@ -247,6 +256,50 @@ export function FilesView() {
     }
   }
 
+  /** 드롭 → 참조 검사 후 이동 (참조 있으면 경고 팝업) */
+  async function handleDrop(fileName: string, toDir: string) {
+    setDragFile(null)
+    setDropDir(null)
+    const curDir = fileName.includes("/")
+      ? fileName.slice(0, fileName.lastIndexOf("/"))
+      : ""
+    if (curDir === toDir) return
+
+    try {
+      const chk = await moveCheck(fileName)
+      if (chk.read_only) {
+        toast.error("읽기 전용 파일은 옮길 수 없습니다", { description: chk.name })
+        return
+      }
+      if (chk.referrer_count > 0) {
+        setMoveWarn({ check: chk, to: toDir })
+        return
+      }
+      await doMove(fileName, toDir, false)
+    } catch (e) {
+      toast.error("이동 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  async function doMove(fileName: string, toDir: string, force: boolean) {
+    try {
+      const res = await moveTinFile(fileName, toDir, force)
+      toast.success(`📦 옮김 — ${res.old_name} → ${res.name}`, {
+        description:
+          res.ref_warning ?? "⚠️ 게임엔 미반영 (다음 재접속 때 적용)",
+      })
+      setMoveWarn(null)
+      await loadList()
+      // 열려 있던 파일이면 새 경로로 다시 연다
+      if (current?.name === fileName) await open(res.name)
+    } catch (e) {
+      const err = e as Error & { status?: number }
+      toast.error("이동 실패", { description: err.message })
+    }
+  }
+
   async function handleCreateDir() {
     const name = prompt("새 폴더 이름 (한글·영문·숫자·_·-)")
     if (!name) return
@@ -336,7 +389,15 @@ export function FilesView() {
       {/* 좌측: 파일 목록 */}
       <div
         className="tin-scroll w-64 shrink-0 overflow-y-auto border-r"
-        style={{ borderColor: "var(--tin-edge)" }}
+        style={{
+          borderColor: dropDir === "" ? "var(--tin-accent)" : "var(--tin-edge)",
+        }}
+        onDragOver={(e) => { e.preventDefault(); setDropDir("") }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const f = e.dataTransfer.getData("text/plain") || dragFile
+          if (f && f.includes("/")) void handleDrop(f, "")
+        }}
       >
         <div
           className="flex items-center gap-2 border-b px-3 py-2.5"
@@ -395,13 +456,23 @@ export function FilesView() {
             return (
               <button
                 key={f.name}
+                draggable={!f.read_only}
+                onDragStart={(e) => {
+                  setDragFile(f.name)
+                  e.dataTransfer.effectAllowed = "move"
+                  e.dataTransfer.setData("text/plain", f.name)
+                }}
+                onDragEnd={() => { setDragFile(null); setDropDir(null) }}
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void open(f.name)}
+                title={f.read_only ? "읽기 전용 (이동 불가)" : "끌어서 폴더로 옮길 수 있습니다"}
                 className="block w-full border-b px-3 py-2 text-left transition"
                 style={{
                   borderColor: "var(--tin-edge-soft)",
                   background: active ? "var(--tin-panel2)" : "transparent",
                   paddingLeft: indent ? 22 : 12,
+                  opacity: dragFile === f.name ? 0.45 : 1,
+                  cursor: f.read_only ? "default" : "grab",
                 }}
               >
                 <div className="flex items-center gap-1.5">
@@ -435,8 +506,20 @@ export function FilesView() {
             out.push(
               <div
                 key={`dir-${d}`}
+                onDragOver={(e) => { e.preventDefault(); setDropDir(d) }}
+                onDragLeave={() => setDropDir((p) => (p === d ? null : p))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  const f = e.dataTransfer.getData("text/plain") || dragFile
+                  if (f) void handleDrop(f, d)
+                }}
                 className="flex items-center gap-1 border-b px-2 py-1.5"
-                style={{ borderColor: "var(--tin-edge)", background: "var(--tin-panel2)" }}
+                style={{
+                  borderColor: dropDir === d ? "var(--tin-accent)" : "var(--tin-edge)",
+                  background: dropDir === d
+                    ? "rgb(var(--tin-accent-rgb) / 0.18)"
+                    : "var(--tin-panel2)",
+                }}
               >
                 <button
                   onMouseDown={(e) => e.preventDefault()}
@@ -795,6 +878,15 @@ export function FilesView() {
           onRename={handleRename}
         />
       )}
+      {moveWarn && (
+        <MoveWarnDialog
+          check={moveWarn.check}
+          toDir={moveWarn.to}
+          onClose={() => setMoveWarn(null)}
+          onConfirm={() => doMove(moveWarn.check.name, moveWarn.to, true)}
+        />
+      )}
+
       {snipForm && (
         <SnippetFormDialog
           form={snipForm}

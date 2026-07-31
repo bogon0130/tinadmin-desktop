@@ -419,3 +419,41 @@ export async function saveParsed(
     },
   )
 }
+
+// ---- 파일 이동 (폴더 간) ----
+export interface MoveCheck {
+  name: string
+  read_only: boolean
+  movable: boolean
+  referrers: Referrer[]
+  referrer_files: string[]
+  referrer_count: number
+  referrer_lines: number
+  in_use_windows: string[]
+}
+
+export interface MoveResult {
+  old_name: string
+  name: string
+  dir: string
+  backup: string | null
+  forced: boolean
+  broken_refs: Referrer[]
+  ref_warning: string | null
+  note: string
+}
+
+export async function moveCheck(name: string): Promise<MoveCheck> {
+  return request<MoveCheck>(`/api/files/move-check/${encodeURIComponent(name)}`)
+}
+
+export async function moveTinFile(
+  from: string,
+  to: string,
+  force = false,
+): Promise<MoveResult> {
+  return request<MoveResult>("/api/files/move", {
+    method: "POST",
+    body: JSON.stringify({ from, to, force }),
+  })
+}
