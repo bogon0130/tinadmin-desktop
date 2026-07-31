@@ -7,7 +7,11 @@ import {
 } from "react"
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   FilePlus2,
+  FolderPlus,
+  Folder,
   KeyRound,
   Loader2,
   Lock,
@@ -19,9 +23,11 @@ import {
 import { toast } from "sonner"
 
 import {
+  createDir,
   createTinFile,
+  deleteDir,
   deleteTinFile,
-  listTinFiles,
+  listTinTree,
   readParsed,
   readTinFile,
   renameTinFile,
@@ -73,6 +79,10 @@ function fmtSize(n: number) {
  */
 export function FilesView() {
   const [files, setFiles] = useState<TinFileMeta[]>([])
+  const [dirs, setDirs] = useState<string[]>([])
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // [새 파일] 을 누를 때 어느 폴더에 만들지 ('' = 최상위)
+  const [targetDir, setTargetDir] = useState("")
   const [current, setCurrent] = useState<TinFileContent | null>(null)
   const [draft, setDraft] = useState("")
   const [loadingList, setLoadingList] = useState(true)
@@ -102,7 +112,9 @@ export function FilesView() {
   const loadList = useCallback(async () => {
     setLoadingList(true)
     try {
-      setFiles(await listTinFiles())
+      const t = await listTinTree()
+      setFiles(t.files)
+      setDirs(t.dirs)
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
@@ -235,9 +247,38 @@ export function FilesView() {
     }
   }
 
+  async function handleCreateDir() {
+    const name = prompt("새 폴더 이름 (한글·영문·숫자·_·-)")
+    if (!name) return
+    try {
+      const res = await createDir(name.trim())
+      toast.success(`📁 폴더 만듦 — ${res.dir}`)
+      await loadList()
+    } catch (e) {
+      toast.error("폴더 만들기 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  async function handleDeleteDir(dir: string) {
+    if (!confirm(`폴더 '${dir}' 를 지울까요? (빈 폴더만 지워집니다)`)) return
+    try {
+      await deleteDir(dir)
+      toast.success(`📁 폴더 지움 — ${dir}`)
+      await loadList()
+    } catch (e) {
+      toast.error("폴더 삭제 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
   async function handleCreate(name: string) {
     try {
-      const res = await createTinFile(name)
+      // 선택한 폴더 안에 만든다
+      const full = targetDir ? `${targetDir}/${name}` : name
+      const res = await createTinFile(full)
       toast.success(`✅ 새 파일 만듦 — ${res.name}`, {
         description: "⚠️ 게임엔 미반영 (다음 재접속 때 적용)",
       })
@@ -308,9 +349,19 @@ export function FilesView() {
             tin 파일 {files.length}개
           </span>
           <button
-            onClick={() => setDialog("create")}
-            title="새 파일 만들기"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => void handleCreateDir()}
+            title="새 폴더 만들기"
             className="ml-auto flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
+            style={{ color: "var(--tin-accent)" }}
+          >
+            <FolderPlus className="size-3.5" />
+          </button>
+          <button
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => { setTargetDir(""); setDialog("create") }}
+            title="새 파일 만들기 (최상위)"
+            className="flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
             style={{ color: "var(--tin-accent)" }}
           >
             <FilePlus2 className="size-3.5" />
@@ -328,40 +379,111 @@ export function FilesView() {
           </button>
         </div>
 
-        {files.map((f) => {
-          const active = current?.name === f.name
-          return (
-            <button
-              key={f.name}
-              onClick={() => void open(f.name)}
-              className="block w-full border-b px-3 py-2 text-left transition"
-              style={{
-                borderColor: "var(--tin-edge-soft)",
-                background: active ? "var(--tin-panel2)" : "transparent",
-              }}
-            >
-              <div className="flex items-center gap-1.5">
-                <span
-                  className="tin-mono truncate"
-                  style={{ color: active ? "var(--tin-accent)" : "var(--tin-fg)" }}
+        {(() => {
+          // 폴더별로 묶는다. 폴더가 비어 있어도 목록에 나오도록 dirs 를 합친다.
+          const groups = new Map<string, TinFileMeta[]>()
+          groups.set("", [])
+          for (const d of dirs) groups.set(d, [])
+          for (const f of files) {
+            const k = f.dir ?? ""
+            if (!groups.has(k)) groups.set(k, [])
+            groups.get(k)!.push(f)
+          }
+
+          const renderFile = (f: TinFileMeta, indent: boolean) => {
+            const active = current?.name === f.name
+            return (
+              <button
+                key={f.name}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => void open(f.name)}
+                className="block w-full border-b px-3 py-2 text-left transition"
+                style={{
+                  borderColor: "var(--tin-edge-soft)",
+                  background: active ? "var(--tin-panel2)" : "transparent",
+                  paddingLeft: indent ? 22 : 12,
+                }}
+              >
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="tin-mono truncate"
+                    style={{ color: active ? "var(--tin-accent)" : "var(--tin-fg)" }}
+                  >
+                    {f.base ?? f.name}
+                  </span>
+                  {f.has_plain_secret && (
+                    <KeyRound className="size-3 shrink-0" style={{ color: "#f5a524" }} />
+                  )}
+                  {f.read_only && <Lock className="size-3 shrink-0 opacity-70" />}
+                </div>
+                <div style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}>
+                  {fmtSize(f.size)} · {f.mtime.slice(5, 16)}
+                  {f.referrer_count > 0 && ` · 참조 ${f.referrer_count}`}
+                </div>
+              </button>
+            )
+          }
+
+          const out: React.ReactNode[] = []
+          // 최상위 파일 먼저
+          for (const f of groups.get("") ?? []) out.push(renderFile(f, false))
+
+          // 폴더들
+          for (const d of [...groups.keys()].filter(Boolean).sort()) {
+            const items = groups.get(d) ?? []
+            const open_ = !collapsed.has(d)
+            out.push(
+              <div
+                key={`dir-${d}`}
+                className="flex items-center gap-1 border-b px-2 py-1.5"
+                style={{ borderColor: "var(--tin-edge)", background: "var(--tin-panel2)" }}
+              >
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() =>
+                    setCollapsed((s) => {
+                      const n = new Set(s)
+                      n.has(d) ? n.delete(d) : n.add(d)
+                      return n
+                    })
+                  }
+                  className="flex items-center gap-1"
+                  style={{ fontSize: "var(--tin-fs-sm)", color: "var(--tin-accent)" }}
                 >
-                  {f.name}
-                </span>
-                {f.has_plain_secret && (
-                  <KeyRound
-                    className="size-3 shrink-0"
-                    style={{ color: "#f5a524" }}
-                  />
+                  {open_ ? (
+                    <ChevronDown className="size-3.5" />
+                  ) : (
+                    <ChevronRight className="size-3.5" />
+                  )}
+                  <Folder className="size-3.5" />
+                  <span className="tin-mono">{d}</span>
+                  <span style={{ opacity: 0.7 }}>{items.length}</span>
+                </button>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { setTargetDir(d); setDialog("create") }}
+                  title={`${d} 안에 새 파일`}
+                  className="ml-auto flex size-5 items-center justify-center rounded hover:bg-[var(--tin-bg)]"
+                >
+                  <FilePlus2 className="size-3" />
+                </button>
+                {items.length === 0 && (
+                  <button
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => void handleDeleteDir(d)}
+                    title="빈 폴더 지우기"
+                    className="flex size-5 items-center justify-center rounded hover:bg-[var(--tin-bg)]"
+                    style={{ color: "var(--destructive)" }}
+                  >
+                    <Trash2 className="size-3" />
+                  </button>
                 )}
-                {f.read_only && <Lock className="size-3 shrink-0 opacity-70" />}
-              </div>
-              <div style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}>
-                {fmtSize(f.size)} · {f.mtime.slice(5, 16)}
-                {f.referrer_count > 0 && ` · 참조 ${f.referrer_count}`}
-              </div>
-            </button>
-          )
-        })}
+              </div>,
+            )
+            if (open_) for (const f of items) out.push(renderFile(f, true))
+          }
+          return out
+        })()}
       </div>
 
       {/* 우측: 편집기 */}

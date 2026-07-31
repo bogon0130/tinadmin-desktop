@@ -242,7 +242,12 @@ export async function getDoc(key: string): Promise<DocContent> {
 // ★이 경로는 서버에서 tmux #read 를 보내지 않는다★
 //   저장은 파일 + 백업까지만이고, 게임 세션에는 다음 재접속 때 적용된다.
 export interface TinFileMeta {
+  /** TIN_DIR 기준 상대경로 (예: 직업/장군.tin) */
   name: string
+  /** 상위 폴더 ('' 이면 최상위) */
+  dir: string
+  /** 폴더 뺀 파일명 */
+  base: string
   size: number
   mtime: string
   mtime_raw: number
@@ -274,6 +279,31 @@ export interface TinFileSaveResult {
 export async function listTinFiles(): Promise<TinFileMeta[]> {
   const d = await request<{ ok: boolean; files: TinFileMeta[] }>("/api/files")
   return d.files ?? []
+}
+
+/** 파일 + 폴더 목록을 함께 받는다 (폴더 트리용) */
+export async function listTinTree(): Promise<{
+  files: TinFileMeta[]
+  dirs: string[]
+}> {
+  const d = await request<{ ok: boolean; files: TinFileMeta[]; dirs: string[] }>(
+    "/api/files",
+  )
+  return { files: d.files ?? [], dirs: d.dirs ?? [] }
+}
+
+export async function createDir(dir: string): Promise<{ dir: string }> {
+  return request<{ dir: string }>("/api/dirs/create", {
+    method: "POST",
+    body: JSON.stringify({ dir }),
+  })
+}
+
+export async function deleteDir(dir: string): Promise<{ dir: string }> {
+  return request<{ dir: string }>("/api/dirs/delete", {
+    method: "POST",
+    body: JSON.stringify({ dir }),
+  })
 }
 
 export async function readTinFile(name: string): Promise<TinFileContent> {
