@@ -11,6 +11,7 @@ import {
   ChevronRight,
   FilePlus2,
   FolderPlus,
+  FolderInput,
   Folder,
   KeyRound,
   Loader2,
@@ -56,6 +57,8 @@ import {
 } from "@/lib/snippets"
 import { SnippetFormDialog } from "@/components/snippet-form"
 import { MoveWarnDialog } from "@/components/move-dialog"
+import { MovePickerDialog } from "@/components/move-picker"
+import { planMove } from "@/lib/move-utils"
 
 /** 실행 중 세션이 쓰는 파일 → 창 이름 (서버 config.FILE_TARGETS 와 같은 내용) */
 const IN_USE = new Map<string, string[]>([
@@ -92,6 +95,8 @@ export function FilesView() {
   const [dropDir, setDropDir] = useState<string | null>(null)
   // 참조당하는 파일을 옮기려 할 때 뜨는 경고
   const [moveWarn, setMoveWarn] = useState<{ check: MoveCheck; to: string } | null>(null)
+  // 드래그가 안 되는 환경을 위한 폴더 선택 팝업
+  const [movePick, setMovePick] = useState<string | null>(null)
   const [current, setCurrent] = useState<TinFileContent | null>(null)
   const [draft, setDraft] = useState("")
   const [loadingList, setLoadingList] = useState(true)
@@ -260,10 +265,8 @@ export function FilesView() {
   async function handleDrop(fileName: string, toDir: string) {
     setDragFile(null)
     setDropDir(null)
-    const curDir = fileName.includes("/")
-      ? fileName.slice(0, fileName.lastIndexOf("/"))
-      : ""
-    if (curDir === toDir) return
+    const plan = planMove(fileName, toDir)
+    if (plan.skip) return
 
     try {
       const chk = await moveCheck(fileName)
@@ -275,7 +278,7 @@ export function FilesView() {
         setMoveWarn({ check: chk, to: toDir })
         return
       }
-      await doMove(fileName, toDir, false)
+      await doMove(fileName, plan.toDir, false)
     } catch (e) {
       toast.error("이동 실패", {
         description: e instanceof Error ? e.message : String(e),
@@ -291,6 +294,7 @@ export function FilesView() {
           res.ref_warning ?? "⚠️ 게임엔 미반영 (다음 재접속 때 적용)",
       })
       setMoveWarn(null)
+      setMovePick(null)
       await loadList()
       // 열려 있던 파일이면 새 경로로 다시 연다
       if (current?.name === fileName) await open(res.name)
@@ -463,7 +467,6 @@ export function FilesView() {
                   e.dataTransfer.setData("text/plain", f.name)
                 }}
                 onDragEnd={() => { setDragFile(null); setDropDir(null) }}
-                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void open(f.name)}
                 title={f.read_only ? "읽기 전용 (이동 불가)" : "끌어서 폴더로 옮길 수 있습니다"}
                 className="block w-full border-b px-3 py-2 text-left transition"
@@ -656,6 +659,18 @@ export function FilesView() {
               <div className="ml-auto flex items-center gap-2">
                 {meta && !readOnly && (
                   <>
+                    <button
+                      onClick={() => setMovePick(current.name)}
+                      title="다른 폴더로 옮기기 (드래그가 안 될 때)"
+                      className="flex items-center gap-1 rounded-md border px-2.5 py-1.5"
+                      style={{
+                        borderColor: "var(--tin-edge)",
+                        fontSize: "var(--tin-fs-sm)",
+                      }}
+                    >
+                      <FolderInput className="size-3.5" />
+                      이동
+                    </button>
                     <button
                       onClick={() => setDialog("rename")}
                       title="이름 바꾸기"
@@ -878,6 +893,15 @@ export function FilesView() {
           onRename={handleRename}
         />
       )}
+      {movePick && (
+        <MovePickerDialog
+          fileName={movePick}
+          dirs={dirs}
+          onClose={() => setMovePick(null)}
+          onPick={(to) => handleDrop(movePick, to)}
+        />
+      )}
+
       {moveWarn && (
         <MoveWarnDialog
           check={moveWarn.check}
