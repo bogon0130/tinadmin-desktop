@@ -470,6 +470,11 @@ export interface ApplyCheck {
   present_windows: string[]
   absent_windows: string[]
   classes: string[]
+  /** #session 이 있는 줄 (있으면 차단) */
+  risk_sessions: { line: number; text: string }[]
+  /** '#' 없는 실행 낱줄 (있으면 확인 필요) */
+  risk_bare: { line: number; text: string }[]
+  needs_confirm: boolean
   can_send: boolean
   blocked: string | null
   warning: string | null
@@ -495,8 +500,11 @@ export async function applyCheck(name: string): Promise<ApplyCheck> {
   return request<ApplyCheck>(`/api/files/apply-check/${encodeURIComponent(name)}`)
 }
 
-export async function applyNow(name: string): Promise<ApplyResult> {
-  return request<ApplyResult>(`/api/files/apply/${encodeURIComponent(name)}`, { method: "POST" })
+export async function applyNow(name: string, force = false): Promise<ApplyResult> {
+  return request<ApplyResult>(`/api/files/apply/${encodeURIComponent(name)}`, {
+    method: "POST",
+    body: JSON.stringify({ force }),
+  })
 }
 
 // ---- 캐릭터 그룹 ----

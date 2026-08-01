@@ -240,6 +240,7 @@ export function FilesView() {
   /* ---- 바로 적용: 살아있는 창에 #read ---- */
   const [applyInfo, setApplyInfo] = useState<ApplyCheck | null>(null)
   const [applying, setApplying] = useState(false)
+  const [riskAck, setRiskAck] = useState(false)
 
   /** 1단계 — 어디로 나가는지 먼저 보여준다 (아직 전송 안 함) */
   async function askApply() {
@@ -247,6 +248,7 @@ export function FilesView() {
     try {
       const info = await applyCheck(current.name)
       setApplyInfo(info)
+      setRiskAck(false)
     } catch (e) {
       toast.error("적용 대상 확인 실패", {
         description: e instanceof Error ? e.message : String(e),
@@ -259,7 +261,7 @@ export function FilesView() {
     if (!current) return
     setApplying(true)
     try {
-      const r = await applyNow(current.name)
+      const r = await applyNow(current.name, riskAck)
       setApplyInfo(null)
       if (!r.sent) {
         toast.warning("대상 창이 떠 있지 않습니다", {
@@ -674,10 +676,47 @@ export function FilesView() {
                 ⛔ {applyInfo.blocked}
               </p>
             )}
+
+            {/* 위험 상세 — 몇 행에 뭐가 있는지 */}
+            {applyInfo.risk_sessions.length > 0 && (
+              <div className="mt-1">
+                {applyInfo.risk_sessions.map((x) => (
+                  <p key={x.line} className="tin-mono" style={{ fontSize: "var(--tin-fs-sm)", color: "var(--destructive)" }}>
+                    🔴 {x.line}행 · 재접속 위험 — {x.text}
+                  </p>
+                ))}
+              </div>
+            )}
+            {applyInfo.risk_bare.length > 0 && (
+              <div
+                className="mt-2 rounded border p-2"
+                style={{ borderColor: "#f5a524" }}
+              >
+                <p style={{ fontSize: "var(--tin-fs-sm)", color: "#f5a524" }}>
+                  ⚠️ 재읽기 시 아래 줄이 <b>그대로 실행</b>돼 캐릭터가 움직일 수 있습니다.
+                </p>
+                {applyInfo.risk_bare.map((x) => (
+                  <p key={x.line} className="tin-mono" style={{ fontSize: "var(--tin-fs-sm)" }}>
+                    {x.line}행 · {x.text}
+                  </p>
+                ))}
+                <label className="mt-1 flex cursor-pointer items-center gap-1.5" style={{ fontSize: "var(--tin-fs-sm)" }}>
+                  <input
+                    type="checkbox"
+                    checked={riskAck}
+                    onChange={(e) => setRiskAck(e.target.checked)}
+                    className="accent-[var(--tin-accent)]"
+                  />
+                  위 내용을 확인했고, 그래도 반영합니다
+                </label>
+              </div>
+            )}
             <div className="mt-2 flex gap-2">
               <button
                 onClick={() => void doApply()}
-                disabled={!applyInfo.can_send || applying}
+                disabled={
+                  !applyInfo.can_send || applying || (applyInfo.needs_confirm && !riskAck)
+                }
                 className="flex items-center gap-1 rounded-md border px-3 py-1 disabled:opacity-40"
                 style={{ borderColor: "var(--tin-accent)", color: "var(--tin-accent)", fontSize: "var(--tin-fs-sm)" }}
               >
