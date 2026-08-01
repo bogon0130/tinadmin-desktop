@@ -160,6 +160,8 @@ export interface CharStats {
   name: string
   count: number
   latest_level: number
+  /** 통계는 붙였지만 아직 레벨업 기록이 없음 */
+  pending?: boolean
   first_at: string
   last_at: string
   gap_avg_min: number | null

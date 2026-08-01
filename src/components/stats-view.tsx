@@ -22,6 +22,9 @@ import {
 
 /** 캐릭터 직업 (docs/00_개요.md 기준) */
 const CLASS_OF: Record<string, string> = {
+  // 천마신군그룹
+  천마신군: "대부 · 리더/딜러",
+  진풍백: "장군",
   한비광: "대부 · 리더/딜러",
   담화린: "교황 · 정신력 회복",
   최상희: "마왕 · 버프",
@@ -181,6 +184,39 @@ function CharConsole({
   const pct = (v: number, m: number) =>
     Math.max(4, Math.min(100, Math.round((v / (m || 1)) * 100)))
 
+  // 통계를 붙였지만 아직 레벨업 기록이 없는 캐릭터 —
+  // 게이지·그래프를 그릴 값이 없으므로 간단한 안내 카드만 보여준다.
+  if (c.pending) {
+    return (
+      <section className="hud-panel mb-6" style={{ opacity: 0.75 }}>
+        <div className="hud-head">
+          <span
+            className="tin-accent font-bold tracking-wide"
+            style={{ fontSize: "var(--tin-fs-lg)" }}
+          >
+            {c.name}
+          </span>
+          <span
+            className="rounded-full border border-[var(--tin-edge)] px-2.5 py-0.5"
+            style={{ fontSize: "var(--tin-fs-sm)" }}
+          >
+            {CLASS_OF[c.name] ?? "—"}
+          </span>
+          <span
+            className="ml-auto tin-mono"
+            style={{ fontSize: "var(--tin-fs-sm)" }}
+          >
+            기록 대기 (0회)
+          </span>
+        </div>
+        <p className="px-4 py-3 leading-relaxed" style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.8 }}>
+          레벨업 통계를 붙여뒀지만 아직 기록이 없습니다.
+          이 캐릭터가 레벨업하면 여기에 실제 수치가 채워집니다.
+        </p>
+      </section>
+    )
+  }
+
   return (
     <section className="hud-panel mb-6">
       {/* 헤더 */}
@@ -216,7 +252,7 @@ function CharConsole({
           label="기간 레벨업"
           value={String(c.count)}
           barPct={pct(c.count, maxCount)}
-          note={`3캐릭 중 최고 ${maxCount} 기준`}
+          note={`최고 ${maxCount} 기준`}
         />
         <Gauge
           label="시간당"
