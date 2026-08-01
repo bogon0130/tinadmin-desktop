@@ -458,6 +458,33 @@ export async function moveTinFile(
   })
 }
 
+// ---- 캐릭터 그룹 ----
+export interface GroupStatsChar {
+  name: string
+  attached: boolean
+  has_log: boolean
+}
+
+export interface CharGroup {
+  name: string
+  session: string
+  dir: string
+  windows: string[]
+  /** tmux 세션이 실제로 떠 있는지 */
+  live: boolean
+  live_windows: string[]
+  /** 등록됐지만 실제로 없는 창 */
+  missing_windows: string[]
+  /** 실제로 있지만 등록되지 않은 창 */
+  extra_windows: string[]
+  files: string[]
+  stats_chars: GroupStatsChar[]
+}
+
+export async function fetchGroups(): Promise<{ groups: CharGroup[] }> {
+  return request<{ groups: CharGroup[] }>("/api/groups")
+}
+
 // ---- 접속 조합 빌더 ----
 export interface ComboIssue {
   file: string

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 import {
   AlarmClock,
   BarChart3,
+  Users,
   BookOpen,
   BookText,
   Boxes,
@@ -50,6 +51,7 @@ import type { TableType, TinEntry } from "@/lib/types"
 import { LoginScreen } from "@/components/login-screen"
 import { EntryTable } from "@/components/entry-table"
 import { FavoritesPanel } from "@/components/favorites-panel"
+import { GroupsView } from "@/components/groups-view"
 import { Cheatsheet } from "@/components/cheatsheet"
 import { RawView } from "@/components/raw-view"
 import { PresetsView } from "@/components/presets-view"
@@ -67,6 +69,7 @@ type ViewId =
   | "stats"
   | "files"
   | "combo"
+  | "groups"
 
 const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "action", label: "자반", icon: Zap },
@@ -80,6 +83,7 @@ const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "class", label: "클래스", icon: Boxes },
   { id: "presets", label: "캐릭터 프리셋", icon: Boxes },
   { id: "notes", label: "정보 저장소", icon: BookText },
+  { id: "groups", label: "캐릭터 그룹", icon: Users },
   { id: "stats", label: "통계", icon: BarChart3 },
   { id: "files", label: "파일 관리", icon: FolderCog },
   { id: "combo", label: "접속 빌더", icon: Plug },
@@ -402,6 +406,7 @@ export default function App() {
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView />}
           {view === "combo" && <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />}
+          {view === "groups" && <GroupsView />}
 
           {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
           {showRef && <ReferencePanel onClose={() => setShowRef(false)} />}
