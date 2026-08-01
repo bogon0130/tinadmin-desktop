@@ -460,6 +460,45 @@ export async function moveTinFile(
   })
 }
 
+// ---- 바로 적용 (살아있는 창에 #read) ----
+export interface ApplyCheck {
+  name: string
+  group: string | null
+  session: string
+  session_live: boolean
+  windows: string[]
+  present_windows: string[]
+  absent_windows: string[]
+  classes: string[]
+  can_send: boolean
+  blocked: string | null
+  warning: string | null
+  note: string | null
+}
+
+export interface ApplyResult extends ApplyCheck {
+  sent: boolean
+  results: {
+    window: string
+    target: string
+    ok: boolean
+    killed: { class: string; ok: boolean; error: string | null }[]
+    loaded: { action: number; alias: number; other: number }
+    summary: string
+    delivered: boolean
+    response: string[]
+    errors: string[]
+  }[]
+}
+
+export async function applyCheck(name: string): Promise<ApplyCheck> {
+  return request<ApplyCheck>(`/api/files/apply-check/${encodeURIComponent(name)}`)
+}
+
+export async function applyNow(name: string): Promise<ApplyResult> {
+  return request<ApplyResult>(`/api/files/apply/${encodeURIComponent(name)}`, { method: "POST" })
+}
+
 // ---- 캐릭터 그룹 ----
 export interface GroupStatsChar {
   name: string

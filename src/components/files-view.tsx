@@ -7,6 +7,7 @@ import {
 } from "react"
 import {
   AlertTriangle,
+  Zap,
   ChevronDown,
   ChevronRight,
   FilePlus2,
@@ -22,6 +23,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
+import { applyCheck, applyNow, type ApplyCheck } from "@/lib/api"
 
 import {
   createDir,
@@ -234,6 +236,55 @@ export function FilesView() {
     }
     setRestoreSel(null)
   }, [restoreSel])
+
+  /* ---- 바로 적용: 살아있는 창에 #read ---- */
+  const [applyInfo, setApplyInfo] = useState<ApplyCheck | null>(null)
+  const [applying, setApplying] = useState(false)
+
+  /** 1단계 — 어디로 나가는지 먼저 보여준다 (아직 전송 안 함) */
+  async function askApply() {
+    if (!current) return
+    try {
+      const info = await applyCheck(current.name)
+      setApplyInfo(info)
+    } catch (e) {
+      toast.error("적용 대상 확인 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
+  /** 2단계 — 확인 후 실제 전송 */
+  async function doApply() {
+    if (!current) return
+    setApplying(true)
+    try {
+      const r = await applyNow(current.name)
+      setApplyInfo(null)
+      if (!r.sent) {
+        toast.warning("대상 창이 떠 있지 않습니다", {
+          description: "다음 접속 때 적용됩니다.",
+        })
+        return
+      }
+      const okCount = r.results.filter((x) => x.ok).length
+      const detail = r.results
+        .map((x) => `${x.window}: ${x.summary}`)
+        .join(" / ")
+      if (okCount === r.results.length) {
+        toast.success(`⚡ ${r.session} 세션 ${okCount}개 창에 반영됨`, { description: detail })
+      } else {
+        toast.error(`${r.results.length - okCount}개 창 실패`, { description: detail })
+      }
+      console.info("[바로 적용]", r)
+    } catch (e) {
+      toast.error("바로 적용 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    } finally {
+      setApplying(false)
+    }
+  }
 
   async function handleSave() {
     if (!current) return
@@ -587,9 +638,62 @@ export function FilesView() {
             className="mr-1.5 inline size-3.5"
             style={{ color: "#f5a524" }}
           />
-          이 화면의 저장은 <b>파일에만</b> 반영됩니다. 게임 세션에는{" "}
-          <b>다음 재접속 때</b> 적용됩니다. (실시간 적용은 다음 단계)
+          이 화면의 저장은 <b>파일에만</b> 반영됩니다. 게임 세션에 지금 반영하려면{" "}
+          <b>[바로 적용]</b> 을 누르세요 — 그 파일을 읽는 창에만 <b>#read</b> 를 보냅니다.
         </div>
+
+        {/* 바로 적용 — 전송 전 확인 */}
+        {applyInfo && (
+          <div
+            className="mx-3 mb-2 rounded-md border p-3"
+            style={{ borderColor: "var(--tin-accent)", background: "var(--tin-panel2)" }}
+          >
+            <p className="mb-1" style={{ fontSize: "var(--tin-fs-sm)" }}>
+              <b className="tin-mono">{applyInfo.name}</b> →{" "}
+              <b className="tin-accent">{applyInfo.session}</b> 세션 /{" "}
+              <b className="tin-accent">
+                {applyInfo.present_windows.join(", ") || "(떠 있는 창 없음)"}
+              </b>{" "}
+              창에 반영합니다.
+            </p>
+            {applyInfo.classes.length > 0 && (
+              <p style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.8 }}>
+                중복 방지: <b className="tin-mono">#class {"{"}{applyInfo.classes.join(", ")}{"}"} kill</b> 후 다시 읽습니다.
+              </p>
+            )}
+            {applyInfo.warning && (
+              <p style={{ fontSize: "var(--tin-fs-sm)", color: "#f5a524" }}>⚠️ {applyInfo.warning}</p>
+            )}
+            {applyInfo.absent_windows.length > 0 && (
+              <p style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.8 }}>
+                안 떠 있는 창: <b>{applyInfo.absent_windows.join(", ")}</b> — 다음 접속 때 적용됩니다.
+              </p>
+            )}
+            {applyInfo.blocked && (
+              <p style={{ fontSize: "var(--tin-fs-sm)", color: "var(--destructive)" }}>
+                ⛔ {applyInfo.blocked}
+              </p>
+            )}
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => void doApply()}
+                disabled={!applyInfo.can_send || applying}
+                className="flex items-center gap-1 rounded-md border px-3 py-1 disabled:opacity-40"
+                style={{ borderColor: "var(--tin-accent)", color: "var(--tin-accent)", fontSize: "var(--tin-fs-sm)" }}
+              >
+                {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
+                지금 반영
+              </button>
+              <button
+                onClick={() => setApplyInfo(null)}
+                className="rounded-md border px-3 py-1"
+                style={{ borderColor: "var(--tin-edge)", fontSize: "var(--tin-fs-sm)" }}
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        )}
 
         {!current ? (
           <div
@@ -636,6 +740,24 @@ export function FilesView() {
                 </span>
               )}
               {readOnly && <ReadOnlyBadge />}
+
+              {/* 바로 적용 — 살아있는 창에 #read */}
+              {!readOnly && (
+                <button
+                  onClick={() => void askApply()}
+                  disabled={applying}
+                  title="이 파일을 읽는 살아있는 창에 지금 반영합니다"
+                  className="flex items-center gap-1 rounded-md border px-2 py-1 disabled:opacity-50"
+                  style={{
+                    borderColor: "var(--tin-accent)",
+                    color: "var(--tin-accent)",
+                    fontSize: "var(--tin-fs-sm)",
+                  }}
+                >
+                  {applying ? <Loader2 className="size-3.5 animate-spin" /> : <Zap className="size-3.5" />}
+                  바로 적용
+                </button>
+              )}
 
               {/* 원문 / 표 탭 */}
               <div className="flex rounded-md border p-0.5" style={{ borderColor: "var(--tin-edge)" }}>
