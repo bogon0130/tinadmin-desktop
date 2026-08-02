@@ -31,13 +31,29 @@ export interface Favorite {
   createdAt: string
 }
 
+/**
+ * 원클릭 즐겨찾기 — 지금 보고 있는 게임 창으로 명령을 바로 보낸다.
+ *
+ * ★예전 "명령 즐겨찾기"(quick_commands.json)와 "양식 즐겨찾기"를 하나로 합친 것★
+ *   두 갈래로 나뉘어 헷갈렸고, 대상 창을 항목마다 지정하느라 만들기도 번거로웠다.
+ *   이제 항목은 {라벨, 명령} 둘뿐이고 대상은 "지금 보는 창"으로 고정한다.
+ */
+export interface CmdFav {
+  id: string
+  label: string
+  /** 창에 그대로 들어갈 명령 한 줄 */
+  command: string
+}
+
 export interface FavStore {
   version: 1
   folders: string[]
   items: Favorite[]
+  /** 원클릭 즐겨찾기. 접속 즐겨찾기(items)와 같은 파일에 나란히 둔다. */
+  commands: CmdFav[]
 }
 
-export const EMPTY_STORE: FavStore = { version: 1, folders: [], items: [] }
+export const EMPTY_STORE: FavStore = { version: 1, folders: [], items: [], commands: [] }
 
 export const MAX_FOLDER_DEPTH = 3
 
@@ -86,6 +102,7 @@ export function parseStore(raw: string): { store: FavStore; warning: string | nu
   const o = data as Record<string, unknown>
   const rawItems = Array.isArray(o.items) ? o.items : []
   const rawFolders = Array.isArray(o.folders) ? o.folders : []
+  const rawCmds = Array.isArray(o.commands) ? o.commands : []
 
   const items: Favorite[] = []
   let dropped = 0
@@ -106,8 +123,24 @@ export function parseStore(raw: string): { store: FavStore; warning: string | nu
     if (it.folder) for (const p of ancestors(it.folder)) all.add(p)
   }
 
+  const commands: CmdFav[] = []
+  for (const c of rawCmds) {
+    if (typeof c !== "object" || c === null) {
+      dropped++
+      continue
+    }
+    const co = c as Record<string, unknown>
+    const label = typeof co.label === "string" ? co.label : ""
+    const command = typeof co.command === "string" ? co.command : ""
+    if (!label || !command) {
+      dropped++
+      continue
+    }
+    commands.push({ id: typeof co.id === "string" && co.id ? co.id : newId(), label, command })
+  }
+
   return {
-    store: { version: 1, folders: [...all].sort(), items },
+    store: { version: 1, folders: [...all].sort(), items, commands },
     warning: dropped > 0 ? `즐겨찾기 ${dropped}개가 손상되어 제외했습니다.` : null,
   }
 }
@@ -207,6 +240,7 @@ export function deleteFolder(s: FavStore, path: string): FavStore {
     return normFolder(parent && rest ? `${parent}/${rest}` : parent || rest)
   }
   return {
+    ...s,
     folders: [...new Set(s.folders.filter((f) => f !== from).map(lift))].filter(Boolean).sort(),
     items: s.items.map((it) => (inside(it.folder) ? { ...it, folder: lift(it.folder) } : it)),
     version: 1,
@@ -222,7 +256,7 @@ export function upsertItem(s: FavStore, fav: Favorite): FavStore {
   const i = s.items.findIndex((x) => x.id === fav.id)
   const items = i === -1 ? [...s.items, fav] : s.items.map((x) => (x.id === fav.id ? fav : x))
   const folders = [...new Set([...s.folders, ...ancestors(fav.folder)])].filter(Boolean).sort()
-  return { version: 1, folders, items }
+  return { ...s, version: 1, folders, items }
 }
 
 export function removeItem(s: FavStore, id: string): FavStore {
@@ -302,4 +336,71 @@ export function remapFiles(s: FavStore, map: Record<string, string>): {
 /** 즐겨찾기 전체가 쓰는 tin 경로 (중복 제거) */
 export function allFavoriteFiles(s: FavStore): string[] {
   return [...new Set(s.items.flatMap((i) => i.files))]
+}
+
+/* ------------------------------------------------------------------ */
+/* 원클릭 즐겨찾기 (라벨 + 명령)                                          */
+/* ------------------------------------------------------------------ */
+
+/** 명령 한 줄로 쓸 수 있는지 — 서버 검증과 같은 기준 */
+export function validCmd(cmd: string): string | null {
+  const c = (cmd ?? "").trim()
+  if (!c) return "보낼 명령을 입력해 주세요."
+  if (c.length > 500) return "명령이 너무 깁니다 (최대 500자)."
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(c)) return "줄바꿈이나 제어문자는 쓸 수 없습니다."
+  return null
+}
+
+export function validCmdLabel(label: string): string | null {
+  const l = (label ?? "").trim()
+  if (!l) return "이름을 입력해 주세요."
+  if (l.length > 40) return "이름이 너무 깁니다 (최대 40자)."
+  return null
+}
+
+export function upsertCmd(s: FavStore, c: CmdFav): FavStore {
+  const i = s.commands.findIndex((x) => x.id === c.id)
+  return {
+    ...s,
+    commands: i === -1 ? [...s.commands, c] : s.commands.map((x) => (x.id === c.id ? c : x)),
+  }
+}
+
+export function removeCmd(s: FavStore, id: string): FavStore {
+  return { ...s, commands: s.commands.filter((x) => x.id !== id) }
+}
+
+/**
+ * 예전 quick_commands.json 을 원클릭 즐겨찾기로 옮긴다.
+ *
+ * 대상 창(session/window)은 버린다 — 이제 "지금 보는 창"으로 보내기 때문이다.
+ * 이미 같은 라벨+명령이 있으면 건너뛴다(여러 번 눌러도 안 늘어난다).
+ */
+export function migrateQuick(s: FavStore, raw: string): { store: FavStore; added: number } {
+  let data: unknown
+  try {
+    data = JSON.parse(raw)
+  } catch {
+    return { store: s, added: 0 }
+  }
+  if (typeof data !== "object" || data === null) return { store: s, added: 0 }
+  const arr = (data as Record<string, unknown>).items
+  if (!Array.isArray(arr)) return { store: s, added: 0 }
+
+  const seen = new Set(s.commands.map((c) => `${c.label}\u0000${c.command}`))
+  const add: CmdFav[] = []
+  for (const it of arr) {
+    if (typeof it !== "object" || it === null) continue
+    const o = it as Record<string, unknown>
+    const label = typeof o.label === "string" ? o.label : ""
+    const command = typeof o.command === "string" ? o.command : ""
+    if (!label || !command) continue
+    const key = `${label}\u0000${command}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    add.push({ id: newId(), label, command })
+  }
+  if (add.length === 0) return { store: s, added: 0 }
+  return { store: { ...s, commands: [...s.commands, ...add] }, added: add.length }
 }

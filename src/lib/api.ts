@@ -572,6 +572,10 @@ export interface SendResult {
   sent: boolean
 }
 
+export async function activeTarget(): Promise<{ target: SendTarget | null }> {
+  return request<{ target: SendTarget | null }>("/api/send/active")
+}
+
 export async function sendTargets(): Promise<{ targets: SendTarget[] }> {
   return request<{ targets: SendTarget[] }>("/api/send/targets")
 }

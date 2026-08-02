@@ -16,6 +16,11 @@ import {
   validName,
   remapFiles,
   allFavoriteFiles,
+  upsertCmd,
+  removeCmd,
+  validCmd,
+  validCmdLabel,
+  migrateQuick,
   type FavStore,
   type Favorite,
 } from "./favorites"
@@ -232,5 +237,76 @@ describe("옛 경로 고치기 (폴더 이름 변경 후 복구)", () => {
     expect(allFavoriteFiles(store).sort()).toEqual(
       ["기본.tin", "장군/유원찬.tin", "직업별_자반/직업_장군.tin", "한비광.tin"].sort(),
     )
+  })
+})
+
+describe("원클릭 즐겨찾기 (라벨 + 명령)", () => {
+  const c = (o: Partial<{ id: string; label: string; command: string }> = {}) => ({
+    id: "c1", label: "수리가자", command: "남;남;동;저장", ...o,
+  })
+
+  test("추가 / 수정 / 삭제", () => {
+    let s = upsertCmd(EMPTY_STORE, c())
+    expect(s.commands.length).toBe(1)
+    s = upsertCmd(s, c({ label: "던전", command: "ㄱ던전" }))
+    expect(s.commands.length).toBe(1)
+    expect(s.commands[0].label).toBe("던전")
+    expect(removeCmd(s, "c1").commands).toEqual([])
+  })
+
+  test("명령 검증 — 개행/제어문자 거부", () => {
+    expect(validCmd("남;남;동;저장")).toBeNull()
+    expect(validCmd("#ignore {action}")).toBeNull()
+    expect(validCmd("")).not.toBeNull()
+    expect(validCmd("남" + String.fromCharCode(10) + "북")).not.toBeNull()
+    expect(validCmdLabel("수리가자")).toBeNull()
+    expect(validCmdLabel("")).not.toBeNull()
+  })
+
+  test("★접속 즐겨찾기와 같은 파일에 있어도 서로 안 지운다★", () => {
+    let s = upsertItem(EMPTY_STORE, fav())          // 접속 즐겨찾기
+    s = upsertCmd(s, c())                            // 원클릭 즐겨찾기
+    expect(s.items.length).toBe(1)
+    expect(s.commands.length).toBe(1)
+    // 폴더 조작을 해도 commands 가 살아남는다
+    const s2 = addFolder(s, "", "업무") as FavStore
+    expect(s2.commands.length).toBe(1)
+    const s3 = deleteFolder(s2, "업무")
+    expect(s3.commands.length).toBe(1)
+  })
+
+  test("저장→읽기 왕복에서 둘 다 보존", () => {
+    let s = upsertItem(EMPTY_STORE, fav())
+    s = upsertCmd(s, c())
+    const back = parseStore(JSON.stringify(s)).store
+    expect(back.items.length).toBe(1)
+    expect(back.commands).toEqual(s.commands)
+  })
+
+  test("예전 quick_commands.json 을 옮겨온다 (대상 창은 버림)", () => {
+    const old = JSON.stringify({
+      version: 1,
+      items: [
+        { id: "q1", label: "자동저장", command: "저장", session: "chunma", window: "커" },
+        { id: "q2", label: "던전", command: "ㄱ던전", session: "goblin", window: "한비광" },
+      ],
+    })
+    const { store: s, added } = migrateQuick(EMPTY_STORE, old)
+    expect(added).toBe(2)
+    expect(s.commands.map((x) => x.label)).toEqual(["자동저장", "던전"])
+    expect(s.commands[0]).not.toHaveProperty("window")
+  })
+
+  test("두 번 옮겨도 안 늘어난다 (중복 방지)", () => {
+    const old = JSON.stringify({ version: 1, items: [{ label: "저장", command: "저장" }] })
+    const one = migrateQuick(EMPTY_STORE, old).store
+    const two = migrateQuick(one, old)
+    expect(two.added).toBe(0)
+    expect(two.store.commands.length).toBe(1)
+  })
+
+  test("깨진 예전 파일은 조용히 무시", () => {
+    expect(migrateQuick(EMPTY_STORE, "{망가짐").added).toBe(0)
+    expect(migrateQuick(EMPTY_STORE, "").added).toBe(0)
   })
 })

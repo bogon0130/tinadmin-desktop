@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react"
 import {
   AlarmClock,
   BarChart3,
-  Send,
   ChevronDown,
   ChevronRight,
   Users,
@@ -55,7 +54,7 @@ import { LoginScreen } from "@/components/login-screen"
 import { EntryTable } from "@/components/entry-table"
 import { FavoritesPanel } from "@/components/favorites-panel"
 import { GroupsView } from "@/components/groups-view"
-import { QuickCommandsPanel } from "@/components/quick-commands-panel"
+import { QuickFavoritesPanel } from "@/components/quick-favorites-panel"
 import { usePersistentState } from "@/lib/persist"
 import { Cheatsheet } from "@/components/cheatsheet"
 import { RawView } from "@/components/raw-view"
@@ -131,8 +130,6 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   // 참고서 패널 — 기본은 접힘 (필요할 때 상단 버튼으로 펼침)
   const [showRef, setShowRef] = useState(false)
-  // 명령 즐겨찾기 패널 — 기본 접힘. 펼침 상태는 유지한다.
-  const [showQuick, setShowQuick] = usePersistentState("tin.panel.quick", false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
   const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
 
@@ -407,18 +404,6 @@ export default function App() {
 
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => setShowQuick((v) => !v)}
-              title="명령 즐겨찾기 — 살아있는 창에 명령을 바로 보낸다"
-              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition"
-              style={{
-                borderColor: showQuick ? "var(--tin-accent)" : "var(--tin-edge)",
-                color: showQuick ? "var(--tin-accent)" : "var(--tin-fg)",
-              }}
-            >
-              <Send className="size-3.5" />
-              명령
-            </button>
-            <button
               onClick={() => setShowRef((v) => !v)}
               title="운영 참고서 (서버 docs/참고서.md)"
               className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition"
@@ -489,7 +474,8 @@ export default function App() {
           )}
 
           {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
-          {showQuick && <QuickCommandsPanel onClose={() => setShowQuick(false)} />}
+          {/* 원클릭 즐겨찾기 — 상시 표시 */}
+          <QuickFavoritesPanel />
           {showRef && <ReferencePanel onClose={() => setShowRef(false)} />}
         </div>
       </div>
