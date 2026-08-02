@@ -7,6 +7,7 @@ import {
 } from "react"
 import {
   AlertTriangle,
+  Star,
   Zap,
   ChevronDown,
   ChevronRight,
@@ -23,7 +24,8 @@ import {
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
-import { usePersistentSet } from "@/lib/persist"
+import { usePersistentSet, usePersistentState } from "@/lib/persist"
+import { TextSnipsPanel } from "@/components/text-snips-panel"
 import { applyCheck, applyNow, type ApplyCheck } from "@/lib/api"
 
 import {
@@ -119,6 +121,8 @@ export function FilesView() {
   const [restoreSel, setRestoreSel] = useState<[number, number] | null>(null)
   // [원문] / [표] 탭
   const [tab, setTab] = useState<"raw" | "table">("raw")
+  // 양식 즐겨찾기 패널 — 펼침 상태는 메뉴를 옮겨도 유지한다
+  const [showSnips, setShowSnips] = usePersistentState("tin.panel.snips", false)
   const [parsed, setParsed] = useState<ParsedFile | null>(null)
   const [tableType, setTableType] = useState<TableType>("action")
   const [tableDirty, setTableDirty] = useState(false)
@@ -783,6 +787,20 @@ export function FilesView() {
               )}
               {readOnly && <ReadOnlyBadge />}
 
+              <button
+                onClick={() => setShowSnips((v) => !v)}
+                title="양식 즐겨찾기 — 자주 쓰는 줄을 파일에 끼워 넣는다"
+                className="flex items-center gap-1 rounded-md border px-2 py-1"
+                style={{
+                  borderColor: showSnips ? "var(--tin-accent)" : "var(--tin-edge)",
+                  color: showSnips ? "var(--tin-accent)" : "var(--tin-fg)",
+                  fontSize: "var(--tin-fs-sm)",
+                }}
+              >
+                <Star className="size-3.5" />
+                양식
+              </button>
+
               {/* 바로 적용 — 살아있는 창에 #read */}
               {!readOnly && (
                 <button
@@ -1089,6 +1107,15 @@ export function FilesView() {
           inUseWindows={IN_USE.get(meta.name) ?? []}
           onClose={() => setDialog(null)}
           onDelete={handleDelete}
+        />
+      )}
+
+      {/* 우측: 양식 즐겨찾기 — 파일에 텍스트를 끼워 넣기만 한다 (tmux 무관) */}
+      {showSnips && (
+        <TextSnipsPanel
+          canInsert={current !== null && !readOnly && tab === "raw"}
+          onInsert={insert}
+          onClose={() => setShowSnips(false)}
         />
       )}
     </div>

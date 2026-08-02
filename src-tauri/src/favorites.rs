@@ -17,6 +17,8 @@ use tauri::Manager;
 const FILE_NAME: &str = "favorites.json";
 /// 명령 즐겨찾기 (살아있는 창에 바로 보내는 명령 목록)
 const CMD_FILE_NAME: &str = "quick_commands.json";
+/// 양식 즐겨찾기 (편집 중인 tin 파일에 끼워 넣는 텍스트 목록)
+const SNIP_FILE_NAME: &str = "text_snippets.json";
 
 fn store_path_named(app: &tauri::AppHandle, file: &str) -> Result<PathBuf, String> {
     let dir = app
@@ -68,6 +70,18 @@ pub fn quickcmds_load(app: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub fn quickcmds_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
     save_json(&app, CMD_FILE_NAME, json)
+}
+
+/// 양식 즐겨찾기 읽기 — 파일이 없으면 빈 문자열.
+#[tauri::command]
+pub fn textsnips_load(app: tauri::AppHandle) -> Result<String, String> {
+    load_json(&app, SNIP_FILE_NAME)
+}
+
+/// 양식 즐겨찾기 저장.
+#[tauri::command]
+pub fn textsnips_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
+    save_json(&app, SNIP_FILE_NAME, json)
 }
 
 fn store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
