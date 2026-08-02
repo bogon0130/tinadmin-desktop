@@ -23,6 +23,7 @@ import {
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
+import { usePersistentSet } from "@/lib/persist"
 import { applyCheck, applyNow, type ApplyCheck } from "@/lib/api"
 
 import {
@@ -89,7 +90,9 @@ function fmtSize(n: number) {
 export function FilesView() {
   const [files, setFiles] = useState<TinFileMeta[]>([])
   const [dirs, setDirs] = useState<string[]>([])
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  // ★localStorage 에 유지한다★ 메뉴를 옮기면 이 컴포넌트가 언마운트되므로
+  //   useState 만으로는 접어둔 폴더가 다시 펼쳐진다.
+  const [collapsed, setCollapsed] = usePersistentSet("tin.files.collapsed")
   // [새 파일] 을 누를 때 어느 폴더에 만들지 ('' = 최상위)
   const [targetDir, setTargetDir] = useState("")
   // 드래그 중인 파일 / 드롭 대상 폴더 하이라이트
