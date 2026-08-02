@@ -542,6 +542,33 @@ export interface RosterGroup {
   characters: RosterChar[]
 }
 
+export interface CharCreated {
+  name: string
+  char: string
+  class: string
+  size: number
+  content: string
+  /** 바로 즐겨찾기에 넣을 수 있는 조합 목록 */
+  files: string[]
+  /** 같은 이름이 다른 분류 폴더에도 있으면 알려준다 */
+  duplicates: string[]
+  note: string
+}
+
+export async function charPreview(cls: string, char: string): Promise<{ content: string }> {
+  return request<{ content: string }>("/api/files/char-preview", {
+    method: "POST",
+    body: JSON.stringify({ class: cls, char }),
+  })
+}
+
+export async function charCreate(cls: string, char: string): Promise<CharCreated> {
+  return request<CharCreated>("/api/files/char-create", {
+    method: "POST",
+    body: JSON.stringify({ class: cls, char }),
+  })
+}
+
 export async function quickRoster(): Promise<{
   groups: RosterGroup[]
   total: number
