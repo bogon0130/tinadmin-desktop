@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react"
 import {
   AlarmClock,
   BarChart3,
+  ChevronDown,
+  ChevronRight,
   Users,
   BookOpen,
   BookText,
@@ -52,6 +54,7 @@ import { LoginScreen } from "@/components/login-screen"
 import { EntryTable } from "@/components/entry-table"
 import { FavoritesPanel } from "@/components/favorites-panel"
 import { GroupsView } from "@/components/groups-view"
+import { usePersistentState } from "@/lib/persist"
 import { Cheatsheet } from "@/components/cheatsheet"
 import { RawView } from "@/components/raw-view"
 import { PresetsView } from "@/components/presets-view"
@@ -71,7 +74,26 @@ type ViewId =
   | "combo"
   | "groups"
 
-const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
+type MenuItem = { id: ViewId; label: string; icon: typeof Zap }
+
+/** 자주 쓰는 메뉴 — 항상 펼쳐져 있다 */
+const MENU: MenuItem[] = [
+  { id: "files", label: "파일 관리", icon: FolderCog },
+  { id: "combo", label: "접속 빌더", icon: Plug },
+  { id: "groups", label: "캐릭터 그룹", icon: Users },
+  { id: "stats", label: "통계", icon: BarChart3 },
+  { id: "presets", label: "캐릭터 프리셋", icon: Boxes },
+  { id: "notes", label: "정보 저장소", icon: BookText },
+  { id: "raw", label: "Raw 편집", icon: FileCode2 },
+]
+
+/**
+ * 자반 항목을 종류별로 직접 편집하는 GUI 메뉴들.
+ *
+ * 파일 관리 화면에서 대부분 처리할 수 있어 평소에는 접어둔다.
+ * 지우지 않는다 — 종류별로 훑어보거나 표로 고칠 때 여전히 쓴다.
+ */
+const ADVANCED: MenuItem[] = [
   { id: "action", label: "자반", icon: Zap },
   { id: "alias", label: "줄임말", icon: Wand2 },
   { id: "variable", label: "변수", icon: Variable },
@@ -81,13 +103,6 @@ const MENU: { id: ViewId; label: string; icon: typeof Zap }[] = [
   { id: "macro", label: "매크로", icon: Keyboard },
   { id: "ticker", label: "타이머", icon: AlarmClock },
   { id: "class", label: "클래스", icon: Boxes },
-  { id: "presets", label: "캐릭터 프리셋", icon: Boxes },
-  { id: "notes", label: "정보 저장소", icon: BookText },
-  { id: "groups", label: "캐릭터 그룹", icon: Users },
-  { id: "stats", label: "통계", icon: BarChart3 },
-  { id: "files", label: "파일 관리", icon: FolderCog },
-  { id: "combo", label: "접속 빌더", icon: Plug },
-  { id: "raw", label: "Raw 편집", icon: FileCode2 },
 ]
 
 function isTableType(v: ViewId): v is TableType {
@@ -99,6 +114,8 @@ export default function App() {
   const [view, setView] = useState<ViewId>("action")
   // 즐겨찾기가 추가되면 이 값을 올려 사이드바를 다시 읽게 한다
   const [favReload, setFavReload] = useState(0)
+  // 고급 섹션 펼침 — 기본 접힘. 메뉴를 옮겨도 유지되게 localStorage 에 둔다.
+  const [advOpen, setAdvOpen] = usePersistentState("tin.menu.advOpen", false)
   // 표 화면 파일 선택기 목록 — 서버에서 받는다(하드코딩 제거).
   // /api/load 가 다룰 수 있는 파일만 담는다 (table_editable=true)
   const [tableFiles, setTableFiles] = useState<string[]>([])
@@ -267,6 +284,44 @@ export default function App() {
             )
           })}
 
+          {/* 고급 — 종류별 GUI 편집기. 평소엔 접어둔다 */}
+          <div className="mt-2 border-t border-sidebar-border pt-2">
+            <button
+              onClick={() => setAdvOpen((v) => !v)}
+              className="mb-0.5 flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[11px] font-semibold tracking-wide text-sidebar-foreground transition hover:bg-sidebar-accent/60"
+            >
+              {advOpen ? (
+                <ChevronDown className="size-3.5 shrink-0" />
+              ) : (
+                <ChevronRight className="size-3.5 shrink-0" />
+              )}
+              <span>고급 · 종류별 편집</span>
+              <span className="ml-auto text-[10px] text-muted-foreground">
+                {ADVANCED.length}
+              </span>
+            </button>
+
+            {advOpen &&
+              ADVANCED.map((m) => {
+                const Icon = m.icon
+                const active = view === m.id
+                return (
+                  <button
+                    key={m.id}
+                    onClick={() => setView(m.id)}
+                    className={`mb-0.5 flex w-full items-center gap-2.5 rounded-md py-2 pl-6 pr-3 text-left text-[13px] transition ${
+                      active
+                        ? "bg-sidebar-accent font-semibold text-primary"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+                    }`}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="truncate">{m.label}</span>
+                  </button>
+                )
+              })}
+          </div>
+
           {/* 즐겨찾기 — 클릭 한 번으로 저장된 방식대로 접속한다 */}
           <FavoritesPanel reloadKey={favReload} />
         </div>
@@ -296,7 +351,7 @@ export default function App() {
         {/* 상단 고정 바 */}
         <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-5 py-3">
           <h2 className="text-sm font-semibold">
-            {MENU.find((m) => m.id === view)?.label}
+            {[...MENU, ...ADVANCED].find((m) => m.id === view)?.label}
           </h2>
 
           {usesFile && (
