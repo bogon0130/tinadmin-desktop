@@ -116,3 +116,35 @@ describe("삽입 — 기존 insertSnippet 재활용", () => {
     expect(r.selStart).toBe(r.selEnd)
   })
 })
+
+describe("스크롤 보존의 전제 — 삽입 지점 위쪽은 안 바뀐다", () => {
+  /**
+   * 화면이 안 튀게 하려고 삽입 후 textarea 의 scrollTop 을 그대로 되돌린다.
+   * 그게 맞으려면 "삽입 지점보다 위쪽 내용은 그대로여야" 한다.
+   * (위쪽이 늘어나면 같은 scrollTop 이 다른 줄을 가리키게 된다)
+   */
+  const long = Array.from({ length: 200 }, (_, i) => `#alias {a${i}} {b${i}}`).join("\n")
+
+  test("중간 삽입 시 앞부분이 한 글자도 안 바뀐다", () => {
+    const at = long.indexOf("{a120}") + 2 // 120번째 줄 한가운데
+    const r = insertSnippet(long, at, at, SAMPLE.text)
+    const lineStart = long.lastIndexOf("\n", at) + 1
+    expect(r.value.slice(0, lineStart)).toBe(long.slice(0, lineStart))
+  })
+
+  test("삽입은 그 줄 끝 = 위쪽 줄 수가 그대로다", () => {
+    const at = long.indexOf("{a120}") + 2
+    const r = insertSnippet(long, at, at, SAMPLE.text)
+    const before = long.slice(0, at).split("\n").length
+    const afterIdx = r.value.indexOf(SAMPLE.text)
+    const linesAbove = r.value.slice(0, afterIdx).split("\n").length
+    // 삽입 줄(120) 바로 다음 줄에 들어간다
+    expect(linesAbove).toBe(before + 1)
+  })
+
+  test("삽입 후 전체 길이는 삽입분만큼만 늘어난다", () => {
+    const at = long.indexOf("{a120}") + 2
+    const r = insertSnippet(long, at, at, SAMPLE.text)
+    expect(r.value.length).toBe(long.length + SAMPLE.text.length + 1)
+  })
+})

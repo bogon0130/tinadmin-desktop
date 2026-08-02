@@ -132,6 +132,9 @@ export function TextSnipsPanel({
         <div key={s.id} className="group border-b px-3 py-2" style={{ borderColor: "var(--tin-edge-soft)" }}>
           <div className="flex items-center gap-1.5">
             <button
+              // 포커스를 뺏지 않는다 — textarea 의 커서 위치를 그대로 써야
+              // 보던 자리에 삽입되고 화면도 안 튄다 (기존 양식 버튼과 동일)
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => insert(s)}
               disabled={!canInsert}
               className="flex min-w-0 flex-1 items-center gap-1.5 text-left disabled:opacity-40"

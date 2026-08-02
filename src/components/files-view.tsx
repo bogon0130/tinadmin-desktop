@@ -121,6 +121,8 @@ export function FilesView() {
   const [snipForm, setSnipForm] = useState<SnippetForm | null>(null)
   // DOM 커밋 직후 복원할 커서 위치 (useLayoutEffect 가 처리)
   const [restoreSel, setRestoreSel] = useState<[number, number] | null>(null)
+  // 삽입 직전 textarea 스크롤 위치 (삽입 후 그대로 되돌린다)
+  const scrollRef = useRef<number | null>(null)
   // [원문] / [표] 탭
   const [tab, setTab] = useState<"raw" | "table">("raw")
   // 양식 즐겨찾기 패널 — 펼침 상태는 메뉴를 옮겨도 유지한다
@@ -226,21 +228,41 @@ export function FilesView() {
     const selStart = ta && touchedRef.current ? ta.selectionStart : draft.length
     const selEnd = ta && touchedRef.current ? ta.selectionEnd : draft.length
     const r = insertSnippet(draft, selStart, selEnd, snippetText)
+    // ★스크롤 위치를 값 바꾸기 전에 찍어둔다★
+    //   controlled textarea 는 value 가 바뀌면 커서뿐 아니라 scrollTop 도 리셋된다.
+    //   파일 중간에 삽입하면 화면이 맨 위로 튀어 매번 다시 내려야 했다.
+    //   삽입은 커서가 있는 줄 '끝'에서 일어나므로 위쪽 내용은 그대로다.
+    //   따라서 원래 scrollTop 을 그대로 되돌리면 보던 자리에 그대로 머문다.
+    scrollRef.current = ta ? ta.scrollTop : 0
     setDraft(r.value)
-    // controlled textarea 는 value 가 바뀌면 커서가 리셋된다.
     // rAF 는 React 커밋 전에 돌 수 있어 복원이 덮어써질 수 있으므로,
     // DOM 커밋 직후 실행이 보장되는 useLayoutEffect 로 복원한다.
     setRestoreSel([r.selStart, r.selEnd])
     setSnipForm(null)
   }
 
-  // 삽입 후 커서 복원 — DOM 이 새 value 로 갱신된 다음에 실행된다
+  // 삽입 후 커서 + 스크롤 복원 — DOM 이 새 value 로 갱신된 다음에 실행된다
   useLayoutEffect(() => {
     if (!restoreSel) return
     const el = taRef.current
     if (el) {
-      el.focus()
+      // preventScroll — focus() 는 캐럿을 보이게 하려고 바깥 컨테이너까지
+      // 스크롤시킨다. 우리가 직접 위치를 맞출 것이므로 그 동작을 막는다.
+      el.focus({ preventScroll: true })
       el.setSelectionRange(restoreSel[0], restoreSel[1])
+
+      const want = scrollRef.current
+      if (want !== null) {
+        el.scrollTop = want
+        // 브라우저가 캐럿을 보이려고 한 번 더 움직이는 경우가 있어,
+        // 다음 프레임에 한 번 더 맞춘다. 그래도 캐럿이 화면 밖이면
+        // (삽입 줄이 아래끝이었던 경우) 최소한만 내려 캐럿을 보이게 한다.
+        requestAnimationFrame(() => {
+          if (!el.isConnected) return
+          if (Math.abs(el.scrollTop - want) > 1) el.scrollTop = want
+          scrollRef.current = null
+        })
+      }
       touchedRef.current = true
     }
     setRestoreSel(null)
