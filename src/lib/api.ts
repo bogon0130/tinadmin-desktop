@@ -507,6 +507,38 @@ export async function applyNow(name: string, force = false): Promise<ApplyResult
   })
 }
 
+// ---- 명령 직접 전송 (명령 즐겨찾기) ----
+export interface SendTarget {
+  group: string
+  session: string
+  window: string
+  live: boolean
+}
+
+export interface SendResult {
+  session: string
+  window: string
+  group: string
+  target: string
+  command: string
+  sent: boolean
+}
+
+export async function sendTargets(): Promise<{ targets: SendTarget[] }> {
+  return request<{ targets: SendTarget[] }>("/api/send/targets")
+}
+
+export async function sendCommand(
+  session: string,
+  window: string,
+  command: string,
+): Promise<SendResult> {
+  return request<SendResult>("/api/send", {
+    method: "POST",
+    body: JSON.stringify({ session, window, command }),
+  })
+}
+
 // ---- 캐릭터 그룹 ----
 export interface GroupStatsChar {
   name: string

@@ -59,6 +59,8 @@ pub fn run() {
             favorites::favorites_load,
             favorites::favorites_save,
             favorites::favorites_path,
+            favorites::quickcmds_load,
+            favorites::quickcmds_save,
         ])
         .on_page_load(|webview, payload| {
             if webview.label() == "main" && matches!(payload.event(), PageLoadEvent::Finished) {

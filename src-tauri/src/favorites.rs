@@ -15,6 +15,60 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 const FILE_NAME: &str = "favorites.json";
+/// 명령 즐겨찾기 (살아있는 창에 바로 보내는 명령 목록)
+const CMD_FILE_NAME: &str = "quick_commands.json";
+
+fn store_path_named(app: &tauri::AppHandle, file: &str) -> Result<PathBuf, String> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("설정 폴더를 찾지 못했습니다: {}", e))?;
+    fs::create_dir_all(&dir).map_err(|e| format!("설정 폴더를 만들지 못했습니다: {}", e))?;
+    Ok(dir.join(file))
+}
+
+/// 공용 저장 루틴 — JSON 검사 + .bak 백업 + 임시파일 rename (원자 교체)
+fn save_json(app: &tauri::AppHandle, file: &str, json: String) -> Result<String, String> {
+    if json.len() > 4 * 1024 * 1024 {
+        return Err("내용이 너무 큽니다.".into());
+    }
+    serde_json::from_str::<serde_json::Value>(&json)
+        .map_err(|e| format!("형식이 올바르지 않아 저장하지 않았습니다: {}", e))?;
+
+    let path = store_path_named(app, file)?;
+    if path.is_file() {
+        let _ = fs::copy(&path, path.with_extension("json.bak"));
+    }
+    let tmp = path.with_extension("json.tmp");
+    {
+        let mut f = fs::File::create(&tmp).map_err(|e| format!("쓰지 못했습니다: {}", e))?;
+        f.write_all(json.as_bytes()).map_err(|e| format!("쓰지 못했습니다: {}", e))?;
+        f.sync_all().ok();
+    }
+    fs::rename(&tmp, &path).map_err(|e| format!("저장하지 못했습니다: {}", e))?;
+    log::info!("저장: {} ({} bytes)", path.display(), json.len());
+    Ok(path.to_string_lossy().to_string())
+}
+
+fn load_json(app: &tauri::AppHandle, file: &str) -> Result<String, String> {
+    let path = store_path_named(app, file)?;
+    if !path.is_file() {
+        return Ok(String::new());
+    }
+    fs::read_to_string(&path).map_err(|e| format!("읽지 못했습니다: {}", e))
+}
+
+/// 명령 즐겨찾기 읽기 — 파일이 없으면 빈 문자열.
+#[tauri::command]
+pub fn quickcmds_load(app: tauri::AppHandle) -> Result<String, String> {
+    load_json(&app, CMD_FILE_NAME)
+}
+
+/// 명령 즐겨찾기 저장.
+#[tauri::command]
+pub fn quickcmds_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
+    save_json(&app, CMD_FILE_NAME, json)
+}
 
 fn store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
