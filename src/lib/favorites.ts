@@ -265,3 +265,41 @@ export async function saveFavorites(s: FavStore): Promise<string> {
 export async function favoritesPath(): Promise<string> {
   return invoke<string>("favorites_path")
 }
+
+/* ------------------------------------------------------------------ */
+/* 옛 경로 고치기                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * 즐겨찾기가 들고 있는 tin 경로를 지금 경로로 갈아끼운다.
+ *
+ * ★왜 필요한가★
+ *   폴더 이름을 바꾸면(예: 장군 -> 2_장군) 즐겨찾기에 저장된 경로가 낡는다.
+ *   즐겨찾기는 이 PC 의 favorites.json 에 있어서 서버가 대신 못 고친다.
+ *   서버에 "이 경로가 지금 어디로 갔는지"만 물어보고, 바꾸는 건 여기서 한다.
+ *
+ * map 에 없는 경로는 손대지 않는다(모호하거나 아예 없는 것).
+ */
+export function remapFiles(s: FavStore, map: Record<string, string>): {
+  store: FavStore
+  changed: { name: string; from: string; to: string }[]
+} {
+  const changed: { name: string; from: string; to: string }[] = []
+  const items = s.items.map((it) => {
+    const files = it.files.map((f) => {
+      const to = map[f]
+      if (to && to !== f) {
+        changed.push({ name: it.name, from: f, to })
+        return to
+      }
+      return f
+    })
+    return { ...it, files }
+  })
+  return { store: { ...s, items }, changed }
+}
+
+/** 즐겨찾기 전체가 쓰는 tin 경로 (중복 제거) */
+export function allFavoriteFiles(s: FavStore): string[] {
+  return [...new Set(s.items.flatMap((i) => i.files))]
+}

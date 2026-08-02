@@ -507,6 +507,21 @@ export async function applyNow(name: string, force = false): Promise<ApplyResult
   })
 }
 
+// ---- 옛 경로 되짚기 (즐겨찾기 경로 고치기) ----
+export interface ResolvedPath {
+  path: string
+  status: "ok" | "moved" | "ambiguous" | "missing"
+  suggest: string | null
+  candidates: string[]
+}
+
+export async function resolvePaths(paths: string[]): Promise<{ results: ResolvedPath[] }> {
+  return request<{ results: ResolvedPath[] }>("/api/files/resolve", {
+    method: "POST",
+    body: JSON.stringify({ paths }),
+  })
+}
+
 // ---- 폴더 이름 변경 ----
 export interface DirRenameCheck {
   dir: string

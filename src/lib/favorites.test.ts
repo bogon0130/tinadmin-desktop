@@ -14,6 +14,8 @@ import {
   renameFolder,
   upsertItem,
   validName,
+  remapFiles,
+  allFavoriteFiles,
   type FavStore,
   type Favorite,
 } from "./favorites"
@@ -176,5 +178,59 @@ describe("접속 방식은 저장 시점에 고정된다", () => {
   test("모르는 값은 solo 로 떨어진다", () => {
     const raw = JSON.stringify({ version: 1, folders: [], items: [{ ...fav(), mode: "evil" }] })
     expect(parseStore(raw).store.items[0].mode).toBe("solo")
+  })
+})
+
+describe("옛 경로 고치기 (폴더 이름 변경 후 복구)", () => {
+  const store: FavStore = {
+    version: 1,
+    folders: [],
+    items: [
+      fav({ id: "a", name: "유원찬", files: ["기본.tin", "장군/유원찬.tin", "직업별_자반/직업_장군.tin"] }),
+      fav({ id: "b", name: "한비광", files: ["기본.tin", "한비광.tin"] }),
+    ],
+  }
+  const MAP = {
+    "기본.tin": "1_기본/기본.tin",
+    "장군/유원찬.tin": "2_장군/유원찬.tin",
+    "직업별_자반/직업_장군.tin": "3_직업별_자반/직업_장군.tin",
+  }
+
+  test("낡은 경로만 갈아끼운다", () => {
+    const { store: next, changed } = remapFiles(store, MAP)
+    expect(next.items[0].files).toEqual([
+      "1_기본/기본.tin",
+      "2_장군/유원찬.tin",
+      "3_직업별_자반/직업_장군.tin",
+    ])
+    // 이미 유효한 한비광.tin 은 그대로
+    expect(next.items[1].files).toEqual(["1_기본/기본.tin", "한비광.tin"])
+    expect(changed.length).toBe(4)
+  })
+
+  test("map 에 없는 경로는 손대지 않는다 (모호/없음)", () => {
+    const { store: next, changed } = remapFiles(store, {})
+    expect(next.items[0].files).toEqual(store.items[0].files)
+    expect(changed).toEqual([])
+  })
+
+  test("#read 순서가 보존된다", () => {
+    const { store: next } = remapFiles(store, MAP)
+    expect(next.items[0].files.length).toBe(3)
+    expect(next.items[0].files[0]).toContain("기본")
+    expect(next.items[0].files[1]).toContain("유원찬")
+  })
+
+  test("이름·세션·접속방식 등 나머지는 안 바뀐다", () => {
+    const { store: next } = remapFiles(store, MAP)
+    expect(next.items[0].name).toBe("유원찬")
+    expect(next.items[0].mode).toBe(store.items[0].mode)
+    expect(next.items[0].session).toBe(store.items[0].session)
+  })
+
+  test("전체 파일 목록은 중복 없이 모은다", () => {
+    expect(allFavoriteFiles(store).sort()).toEqual(
+      ["기본.tin", "장군/유원찬.tin", "직업별_자반/직업_장군.tin", "한비광.tin"].sort(),
+    )
   })
 })
