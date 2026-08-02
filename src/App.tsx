@@ -55,7 +55,7 @@ import { EntryTable } from "@/components/entry-table"
 import { FavoritesPanel } from "@/components/favorites-panel"
 import { GroupsView } from "@/components/groups-view"
 import { QuickFavoritesPanel } from "@/components/quick-favorites-panel"
-import { usePersistentState } from "@/lib/persist"
+import { usePanelWidth, usePersistentState } from "@/lib/persist"
 import { Cheatsheet } from "@/components/cheatsheet"
 import { RawView } from "@/components/raw-view"
 import { PresetsView } from "@/components/presets-view"
@@ -119,6 +119,9 @@ export default function App() {
   const [openFile, setOpenFile] = useState<string | null>(null)
   // 고급 섹션 펼침 — 기본 접힘. 메뉴를 옮겨도 유지되게 localStorage 에 둔다.
   const [advOpen, setAdvOpen] = usePersistentState("tin.menu.advOpen", false)
+  // 왼쪽 사이드바 폭 — 경계를 끌어 조절하고 재시작해도 유지된다.
+  // 기본값을 224px(w-56)에서 288px 로 넓혔다. 즐겨찾기 경로가 잘려서다.
+  const [navW, setNavW] = usePanelWidth("tin.nav.width", 288, 200, 560)
   // 표 화면 파일 선택기 목록 — 서버에서 받는다(하드코딩 제거).
   // /api/load 가 다룰 수 있는 파일만 담는다 (table_editable=true)
   const [tableFiles, setTableFiles] = useState<string[]>([])
@@ -254,7 +257,10 @@ export default function App() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       {/* 사이드바 */}
-      <nav className="flex w-56 shrink-0 flex-col border-r border-sidebar-border bg-sidebar">
+      <nav
+        className="relative flex shrink-0 flex-col border-r border-sidebar-border bg-sidebar"
+        style={{ width: navW }}
+      >
         <div className="flex items-center gap-2.5 px-4 py-4">
           <div className="flex size-8 items-center justify-center rounded-md bg-primary/15 text-primary">
             <Terminal className="size-4" />
@@ -347,6 +353,31 @@ export default function App() {
             <LogOut className="size-4" /> 로그아웃
           </button>
         </div>
+
+        {/* 오른쪽 경계 — 끌어서 폭 조절 */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault()
+            const startX = e.clientX
+            const startW = navW
+            const move = (ev: MouseEvent) => setNavW(startW + (ev.clientX - startX))
+            const up = () => {
+              window.removeEventListener("mousemove", move)
+              window.removeEventListener("mouseup", up)
+              document.body.style.cursor = ""
+              document.body.style.userSelect = ""
+            }
+            // 드래그 중 글자가 선택되면 커서가 튀므로 잠시 막는다
+            document.body.style.cursor = "col-resize"
+            document.body.style.userSelect = "none"
+            window.addEventListener("mousemove", move)
+            window.addEventListener("mouseup", up)
+          }}
+          onDoubleClick={() => setNavW(288)}
+          title="끌어서 폭 조절 (두 번 누르면 기본값)"
+          className="absolute inset-y-0 right-0 w-1.5 cursor-col-resize hover:bg-[var(--primary)]"
+          style={{ opacity: 0.5 }}
+        />
       </nav>
 
       {/* 본문 */}

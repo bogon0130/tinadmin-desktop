@@ -17,7 +17,7 @@ class MemStore {
 const store = new MemStore()
 ;(globalThis as unknown as { localStorage: MemStore }).localStorage = store
 
-const { usePersistentSet, usePersistentState } = await import("./persist")
+const { usePersistentSet, usePersistentState, clampWidth } = await import("./persist")
 
 /**
  * 훅을 리액트 없이 돌리기 위한 최소 러너.
@@ -84,5 +84,30 @@ describe("접힘 상태 저장 (localStorage)", () => {
     }
     r.fakeUseState(init)
     expect([...r.get()]).toEqual(["A"])
+  })
+})
+
+describe("패널 폭 저장", () => {
+  test("범위 안 값은 그대로", () => {
+    expect(clampWidth(300, 200, 560)).toBe(300)
+  })
+  test("너무 작으면 최소값 (패널이 사라지지 않게)", () => {
+    expect(clampWidth(10, 200, 560)).toBe(200)
+    expect(clampWidth(-50, 200, 560)).toBe(200)
+  })
+  test("너무 크면 최대값 (화면을 덮지 않게)", () => {
+    expect(clampWidth(9999, 200, 560)).toBe(560)
+  })
+  test("NaN 은 최소값, 무한대는 양 끝으로 눌린다", () => {
+    expect(clampWidth(NaN, 200, 560)).toBe(200)
+    expect(clampWidth(Infinity, 200, 560)).toBe(560)
+    expect(clampWidth(-Infinity, 200, 560)).toBe(200)
+  })
+  test("소수는 반올림", () => {
+    expect(clampWidth(300.6, 200, 560)).toBe(301)
+  })
+  test("저장/복원 왕복", () => {
+    store.setItem("tin.nav.width", JSON.stringify(320))
+    expect(clampWidth(JSON.parse(store.getItem("tin.nav.width")!), 200, 560)).toBe(320)
   })
 })

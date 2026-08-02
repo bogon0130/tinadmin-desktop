@@ -527,6 +527,30 @@ export interface QuickLookup {
   searched: string[]
 }
 
+export interface RosterChar {
+  name: string
+  char_file: string
+  /** 조합에 그대로 넣을 #read 순서 */
+  files: string[]
+}
+
+export interface RosterGroup {
+  dir: string
+  class: string
+  job_file: string | null
+  job_exists: boolean
+  characters: RosterChar[]
+}
+
+export async function quickRoster(): Promise<{
+  groups: RosterGroup[]
+  total: number
+  base: string
+  base_exists: boolean
+}> {
+  return request("/api/files/quick-roster")
+}
+
 export async function quickLookup(char: string): Promise<QuickLookup> {
   return request<QuickLookup>("/api/files/quick-lookup", {
     method: "POST",

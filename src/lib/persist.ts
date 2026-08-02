@@ -87,3 +87,34 @@ export function usePersistentState<T>(
 
   return [value, set]
 }
+
+/**
+ * 드래그로 조절하는 패널 폭. localStorage 에 유지한다.
+ *
+ * min/max 로 가둬서, 저장된 값이 이상해도(0 이나 화면보다 큰 값) 패널이
+ * 사라지거나 화면을 덮지 않게 한다.
+ */
+export function clampWidth(v: number, min: number, max: number): number {
+  // NaN 은 비교가 전부 false 라 Math.max/min 을 그냥 통과한다. 먼저 걸러낸다.
+  if (typeof v !== "number" || Number.isNaN(v)) return min
+  // ±Infinity 는 Math.max/min 이 알아서 양 끝으로 눌러준다.
+  return Math.max(min, Math.min(max, Math.round(v)))
+}
+
+export function usePanelWidth(
+  key: string,
+  initial: number,
+  min = 180,
+  max = 640,
+): [number, (v: number) => void] {
+  const [w, setW] = useState<number>(() => clampWidth(readJSON<number>(key, initial), min, max))
+  const set = useCallback(
+    (v: number) => {
+      const next = clampWidth(v, min, max)
+      writeJSON(key, next)
+      setW(next)
+    },
+    [key, min, max],
+  )
+  return [w, set]
+}
