@@ -1,13 +1,16 @@
 import { invoke } from "@tauri-apps/api/core"
 
 /**
- * 캐릭터별 메모/할일.
+ * 메모/할일 저장소 — 캐릭터별과 그룹별 두 가지.
  *
- * 캐릭터 이름을 키로 자유 텍스트를 저장한다 (char_notes.json).
+ * 이름을 키로 자유 텍스트를 저장한다.
+ *   캐릭터 메모 : char_notes.json  (키 = 캐릭터 이름)
+ *   그룹 메모   : group_notes.json (키 = 그룹 이름)
+ * 자료 구조가 똑같아서 파싱·수정 함수를 공유하고 저장 파일만 나눈다.
  * 서버가 아니라 이 PC 에 둔다 — "이 캐릭 뭘 고쳐야 하더라" 같은 개인 메모라
  * 서버 설정과 성격이 다르고, 서버를 건드리지 않아야 안전하다.
  *
- * 캐릭터 이름이 바뀌면 메모는 따라가지 않는다(옛 이름으로 남는다).
+ * 이름이 바뀌면 메모는 따라가지 않는다(옛 이름으로 남는다).
  * 지우지는 않으므로 이름을 되돌리면 다시 보인다.
  */
 
@@ -80,4 +83,15 @@ export async function loadNotes(): Promise<{ store: NoteStore; warning: string |
 
 export async function saveNotes(s: NoteStore): Promise<string> {
   return invoke<string>("charnotes_save", { json: JSON.stringify(s, null, 2) })
+}
+
+/* ---- 그룹 메모 (같은 구조, 다른 파일) ---- */
+
+export async function loadGroupNotes(): Promise<{ store: NoteStore; warning: string | null }> {
+  const raw = await invoke<string>("groupnotes_load")
+  return parseNotes(raw)
+}
+
+export async function saveGroupNotes(s: NoteStore): Promise<string> {
+  return invoke<string>("groupnotes_save", { json: JSON.stringify(s, null, 2) })
 }

@@ -79,3 +79,42 @@ describe("깨진 파일 방어", () => {
     expect(parseNotes(raw).store.notes["커"].length).toBe(MAX_NOTE)
   })
 })
+
+describe("그룹 메모 — 캐릭터 메모와 같은 구조, 다른 파일", () => {
+  test("그룹명을 키로 저장/조회된다", () => {
+    const s = setNote(EMPTY_NOTES, "천마신군그룹", "수리 alias 4명 누락")
+    expect(getNote(s, "천마신군그룹")).toBe("수리 alias 4명 누락")
+  })
+
+  test("★두 저장소가 서로 안 섞인다★ (다른 객체이므로 독립)", () => {
+    const charStore = setNote(EMPTY_NOTES, "천마신군", "캐릭 메모")
+    const groupStore = setNote(EMPTY_NOTES, "천마신군그룹", "그룹 메모")
+    // 캐릭 저장소에 그룹 키가 없고, 그 반대도 마찬가지
+    expect(getNote(charStore, "천마신군그룹")).toBe("")
+    expect(getNote(groupStore, "천마신군")).toBe("")
+    expect(getNote(charStore, "천마신군")).toBe("캐릭 메모")
+    expect(getNote(groupStore, "천마신군그룹")).toBe("그룹 메모")
+  })
+
+  test("그룹 두 개가 독립적이다", () => {
+    let s = setNote(EMPTY_NOTES, "한비광그룹", "A")
+    s = setNote(s, "천마신군그룹", "B")
+    expect(getNote(s, "한비광그룹")).toBe("A")
+    expect(getNote(s, "천마신군그룹")).toBe("B")
+  })
+
+  test("빈 메모면 ● 표시가 사라진다 (항목 삭제)", () => {
+    let s = setNote(EMPTY_NOTES, "한비광그룹", "할일")
+    expect(getNote(s, "한비광그룹")).toBeTruthy()
+    s = setNote(s, "한비광그룹", "")
+    expect(getNote(s, "한비광그룹")).toBe("")
+    expect(Object.keys(s.notes)).toEqual([])
+  })
+
+  test("왕복 보존 (재시작 후 유지되는지의 자료층 근거)", () => {
+    const s = setNote(setNote(EMPTY_NOTES, "한비광그룹", "가"), "천마신군그룹", "나")
+    const round = parseNotes(JSON.stringify(s)).store
+    expect(round).toEqual(s)
+    expect(getNote(round, "천마신군그룹")).toBe("나")
+  })
+})

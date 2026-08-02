@@ -6,7 +6,9 @@ import { fetchGroups, type CharGroup } from "@/lib/api"
 import {
   EMPTY_NOTES,
   getNote,
+  loadGroupNotes,
   loadNotes,
+  saveGroupNotes,
   saveNotes,
   setNote,
   validNote,
@@ -29,6 +31,10 @@ export function GroupsView({ onOpenFile }: { onOpenFile?: (name: string) => void
   /** 지금 메모를 펼쳐 편집 중인 캐릭터 */
   const [editing, setEditing] = useState<string | null>(null)
   const [draft, setDraft] = useState("")
+  /** 그룹 메모 — 캐릭터 메모와 같은 구조, 다른 파일 */
+  const [gNotes, setGNotes] = useState<NoteStore>(EMPTY_NOTES)
+  const [gEditing, setGEditing] = useState<string | null>(null)
+  const [gDraft, setGDraft] = useState("")
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -50,6 +56,13 @@ export function GroupsView({ onOpenFile }: { onOpenFile?: (name: string) => void
     } catch {
       setNotes(EMPTY_NOTES)
     }
+    try {
+      const { store, warning } = await loadGroupNotes()
+      setGNotes(store)
+      if (warning) toast.warning("그룹 메모", { description: warning })
+    } catch {
+      setGNotes(EMPTY_NOTES)
+    }
   }, [])
 
   useEffect(() => {
@@ -70,6 +83,24 @@ export function GroupsView({ onOpenFile }: { onOpenFile?: (name: string) => void
       await saveNotes(next)
     } catch (e) {
       toast.error("메모 저장 실패", { description: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  async function commitGroupNote(name: string) {
+    const bad = validNote(gDraft)
+    if (bad) {
+      toast.error(bad)
+      return
+    }
+    const next = setNote(gNotes, name, gDraft)
+    setGNotes(next)
+    setGEditing(null)
+    try {
+      await saveGroupNotes(next)
+    } catch (e) {
+      toast.error("그룹 메모 저장 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
     }
   }
 
@@ -116,11 +147,73 @@ export function GroupsView({ onOpenFile }: { onOpenFile?: (name: string) => void
               </span>
             )}
             {g.dir && (
-              <span className="tin-mono ml-auto" style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.6 }}>
+              <span className="tin-mono" style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.6 }}>
                 tin/{g.dir}/
               </span>
             )}
+
+            {/* 그룹 전체 메모 — 캐릭터 메모와 별개 */}
+            <button
+              onClick={() => {
+                setGEditing(gEditing === g.name ? null : g.name)
+                setGDraft(getNote(gNotes, g.name))
+              }}
+              className="ml-auto flex items-center gap-1 rounded border px-2 py-0.5"
+              style={{
+                borderColor: getNote(gNotes, g.name) ? "var(--tin-accent)" : "var(--tin-edge)",
+                color: getNote(gNotes, g.name) ? "var(--tin-accent)" : "var(--tin-fg)",
+                fontSize: "var(--tin-fs-sm)",
+              }}
+              title="그룹 전체의 할일 / 문제"
+            >
+              <StickyNote className="size-3" />
+              그룹 메모{getNote(gNotes, g.name) ? " ●" : ""}
+            </button>
           </div>
+
+          {/* 그룹 메모 본문 */}
+          {gEditing === g.name ? (
+            <div className="mb-3">
+              <textarea
+                value={gDraft}
+                onChange={(e) => setGDraft(e.target.value)}
+                rows={4}
+                placeholder="이 그룹 전체의 할일/문제를 적어두세요"
+                className="tin-mono w-full rounded-md border bg-transparent px-2 py-1 outline-none focus:border-[var(--tin-accent)]"
+                style={{ borderColor: "var(--tin-edge)", resize: "vertical" }}
+              />
+              <div className="mt-1 flex gap-2">
+                <button
+                  onClick={() => void commitGroupNote(g.name)}
+                  className="rounded-md border px-3 py-0.5"
+                  style={{ borderColor: "var(--tin-accent)", color: "var(--tin-accent)", fontSize: "var(--tin-fs-sm)" }}
+                >
+                  저장
+                </button>
+                <button
+                  onClick={() => setGEditing(null)}
+                  className="rounded-md border px-3 py-0.5"
+                  style={{ borderColor: "var(--tin-edge)", fontSize: "var(--tin-fs-sm)" }}
+                >
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : (
+            getNote(gNotes, g.name) && (
+              <pre
+                className="mb-3 rounded px-2 py-1.5"
+                style={{
+                  fontSize: "var(--tin-fs-sm)",
+                  background: "var(--tin-panel2)",
+                  whiteSpace: "pre-wrap",
+                  opacity: 0.9,
+                }}
+              >
+                {getNote(gNotes, g.name)}
+              </pre>
+            )
+          )}
 
           {/* 캐릭터 카드 — 메모 + 연결된 tin */}
           <p className="hud-sect">

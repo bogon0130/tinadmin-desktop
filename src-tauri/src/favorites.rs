@@ -21,6 +21,8 @@ const CMD_FILE_NAME: &str = "quick_commands.json";
 const SNIP_FILE_NAME: &str = "text_snippets.json";
 /// 캐릭터별 메모/할일
 const NOTE_FILE_NAME: &str = "char_notes.json";
+/// 그룹 전체 메모/할일 (캐릭터 메모와 별개 파일)
+const GROUP_NOTE_FILE_NAME: &str = "group_notes.json";
 
 fn store_path_named(app: &tauri::AppHandle, file: &str) -> Result<PathBuf, String> {
     let dir = app
@@ -96,6 +98,18 @@ pub fn charnotes_load(app: tauri::AppHandle) -> Result<String, String> {
 #[tauri::command]
 pub fn charnotes_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
     save_json(&app, NOTE_FILE_NAME, json)
+}
+
+/// 그룹 메모 읽기 — 파일이 없으면 빈 문자열.
+#[tauri::command]
+pub fn groupnotes_load(app: tauri::AppHandle) -> Result<String, String> {
+    load_json(&app, GROUP_NOTE_FILE_NAME)
+}
+
+/// 그룹 메모 저장.
+#[tauri::command]
+pub fn groupnotes_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
+    save_json(&app, GROUP_NOTE_FILE_NAME, json)
 }
 
 fn store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
