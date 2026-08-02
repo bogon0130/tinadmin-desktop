@@ -507,6 +507,39 @@ export async function applyNow(name: string, force = false): Promise<ApplyResult
   })
 }
 
+// ---- 폴더 이름 변경 ----
+export interface DirRenameCheck {
+  dir: string
+  new_dir: string
+  files_inside: string[]
+  refs: { file: string; line: number; raw: string; absolute: boolean }[]
+  ref_count: number
+  exists: boolean
+}
+
+export interface DirRenameResult {
+  old_dir: string
+  dir: string
+  files_inside: string[]
+  updated_refs: { file: string; line: number; before: string; after: string }[]
+  backups: { file: string; backup: string }[]
+  note: string
+}
+
+export async function dirRenameCheck(dir: string, newDir: string): Promise<DirRenameCheck> {
+  return request<DirRenameCheck>("/api/dirs/rename-check", {
+    method: "POST",
+    body: JSON.stringify({ dir, new_dir: newDir }),
+  })
+}
+
+export async function dirRename(dir: string, newDir: string): Promise<DirRenameResult> {
+  return request<DirRenameResult>("/api/dirs/rename", {
+    method: "POST",
+    body: JSON.stringify({ dir, new_dir: newDir }),
+  })
+}
+
 // ---- 명령 직접 전송 (명령 즐겨찾기) ----
 export interface SendTarget {
   group: string

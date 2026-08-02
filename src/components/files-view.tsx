@@ -33,6 +33,8 @@ import {
   createTinFile,
   deleteDir,
   deleteTinFile,
+  dirRename,
+  dirRenameCheck,
   listTinTree,
   moveCheck,
   moveTinFile,
@@ -378,6 +380,47 @@ export function FilesView() {
     }
   }
 
+  /**
+   * 폴더 이름 변경.
+   *
+   * 폴더가 바뀌면 그 안 파일을 가리키던 #read 경로가 전부 깨진다.
+   * 그래서 먼저 서버에 물어 몇 곳이 영향받는지 보여주고, 확인을 받은 뒤 진행한다.
+   * 서버가 경로를 자동으로 고쳐주고, 실패하면 폴더 이름을 되돌린다.
+   */
+  async function handleRenameDir(d: string) {
+    const cur = d.split("/").pop() ?? d
+    const name = prompt(`"${d}" 의 새 이름 (한글·영문·숫자·_·-)`, cur)
+    if (name === null) return
+    const parent = d.split("/").slice(0, -1).join("/")
+    const newDir = parent ? `${parent}/${name.trim()}` : name.trim()
+    if (!newDir || newDir === d) return
+
+    try {
+      const chk = await dirRenameCheck(d, newDir)
+      if (chk.exists) {
+        toast.error("이미 같은 이름의 폴더가 있습니다.")
+        return
+      }
+      const msg =
+        chk.ref_count > 0
+          ? `${d} → ${newDir}\n\n파일 ${chk.files_inside.length}개가 들어 있고, ` +
+            `이 폴더를 가리키는 #read 가 ${chk.ref_count}곳 있습니다.\n` +
+            `그 경로를 자동으로 고칩니다 (고치기 전 백업).\n\n` +
+            chk.refs.map((r) => `  ${r.file}:${r.line}  ${r.raw}`).join("\n") +
+            `\n\n진행할까요?`
+          : `${d} → ${newDir}\n\n고쳐야 할 #read 는 없습니다. 진행할까요?`
+      if (!confirm(msg)) return
+
+      const r = await dirRename(d, newDir)
+      toast.success(`📁 ${r.old_dir} → ${r.dir}`, { description: r.note })
+      await loadList()
+    } catch (e) {
+      toast.error("폴더 이름 변경 실패", {
+        description: e instanceof Error ? e.message : String(e),
+      })
+    }
+  }
+
   async function handleDeleteDir(dir: string) {
     if (!confirm(`폴더 '${dir}' 를 지울까요? (빈 폴더만 지워집니다)`)) return
     try {
@@ -612,6 +655,14 @@ export function FilesView() {
                   className="ml-auto flex size-5 items-center justify-center rounded hover:bg-[var(--tin-bg)]"
                 >
                   <FilePlus2 className="size-3" />
+                </button>
+                <button
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => void handleRenameDir(d)}
+                  title={`${d} 이름 바꾸기`}
+                  className="flex size-5 items-center justify-center rounded hover:bg-[var(--tin-bg)]"
+                >
+                  <Pencil className="size-3" />
                 </button>
                 {items.length === 0 && (
                   <button
