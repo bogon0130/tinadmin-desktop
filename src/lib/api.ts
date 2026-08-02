@@ -507,6 +507,33 @@ export async function applyNow(name: string, force = false): Promise<ApplyResult
   })
 }
 
+// ---- 빠른 추가 (캐릭터명 -> 분류 자동 검색) ----
+export interface QuickFound {
+  dir: string
+  /** 대부 / 장군 / 교황 … */
+  class: string
+  char_file: string
+  job_file: string | null
+  job_exists: boolean
+  /** 조합에 그대로 넣을 #read 순서 */
+  files: string[]
+}
+
+export interface QuickLookup {
+  char: string
+  found: QuickFound[]
+  status: "ok" | "ambiguous" | "missing"
+  base_exists: boolean
+  searched: string[]
+}
+
+export async function quickLookup(char: string): Promise<QuickLookup> {
+  return request<QuickLookup>("/api/files/quick-lookup", {
+    method: "POST",
+    body: JSON.stringify({ char }),
+  })
+}
+
 // ---- 옛 경로 되짚기 (즐겨찾기 경로 고치기) ----
 export interface ResolvedPath {
   path: string
