@@ -116,6 +116,8 @@ export default function App() {
   const [view, setView] = useState<ViewId>("action")
   // 즐겨찾기가 추가되면 이 값을 올려 사이드바를 다시 읽게 한다
   const [favReload, setFavReload] = useState(0)
+  // 캐릭터 그룹에서 tin 링크를 누르면 파일 관리로 넘어가며 열 파일을 전달한다
+  const [openFile, setOpenFile] = useState<string | null>(null)
   // 고급 섹션 펼침 — 기본 접힘. 메뉴를 옮겨도 유지되게 localStorage 에 둔다.
   const [advOpen, setAdvOpen] = usePersistentState("tin.menu.advOpen", false)
   // 표 화면 파일 선택기 목록 — 서버에서 받는다(하드코딩 제거).
@@ -475,9 +477,16 @@ export default function App() {
           )}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
-          {view === "files" && <FilesView />}
+          {view === "files" && <FilesView openFile={openFile} />}
           {view === "combo" && <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />}
-          {view === "groups" && <GroupsView />}
+          {view === "groups" && (
+            <GroupsView
+              onOpenFile={(name) => {
+                setOpenFile(name)
+                setView("files")
+              }}
+            />
+          )}
 
           {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
           {showQuick && <QuickCommandsPanel onClose={() => setShowQuick(false)} />}

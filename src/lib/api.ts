@@ -579,7 +579,19 @@ export interface GroupStatsChar {
   has_log: boolean
 }
 
+export interface GroupCharacter {
+  name: string
+  live: boolean
+  /** #read 사슬까지 따라간 전체 tin 목록 */
+  files: string[]
+  /** FILE_TARGETS 로 직접 매핑된 tin */
+  direct_files: string[]
+  has_stats: boolean
+  stats_logged: boolean
+}
+
 export interface CharGroup {
+  characters: GroupCharacter[]
   name: string
   session: string
   dir: string

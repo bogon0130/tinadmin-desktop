@@ -91,7 +91,7 @@ function fmtSize(n: number) {
  *   실행 중인 사냥 자반이 저장 즉시 바뀌는 사고를 막기 위한 의도된 동작이고,
  *   실시간 반영은 나중에 별도 "적용" 기능으로 만든다.
  */
-export function FilesView() {
+export function FilesView({ openFile }: { openFile?: string | null }) {
   const [files, setFiles] = useState<TinFileMeta[]>([])
   const [dirs, setDirs] = useState<string[]>([])
   // ★localStorage 에 유지한다★ 메뉴를 옮기면 이 컴포넌트가 언마운트되므로
@@ -219,6 +219,20 @@ export function FilesView() {
       setTableSaving(false)
     }
   }
+
+  // 캐릭터 그룹 화면에서 tin 링크를 눌러 넘어온 경우 그 파일을 자동으로 연다.
+  // 이미 그 파일이 열려 있으면 아무것도 안 한다(편집 중이던 내용을 지키기 위해).
+  const openedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!openFile) return
+    if (openedRef.current === openFile) return
+    if (current?.name === openFile) {
+      openedRef.current = openFile
+      return
+    }
+    openedRef.current = openFile
+    void open(openFile)
+  }, [openFile, open, current?.name])
 
   /** 완성된 tin 줄을 커서 위치에 삽입 */
   function insert(snippetText: string) {
