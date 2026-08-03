@@ -1,14 +1,17 @@
 /**
  * 접속 즐겨찾기 — 자료구조와 트리 조작.
  *
- * 저장은 앱 설정폴더의 favorites.json (Rust favorites_load/save).
- * 이 파일에는 화면과 무관한 순수 함수만 둔다 — 그래야 테스트할 수 있다.
+ * 저장은 서버 features/favorites.json (GET/POST /api/favorites) — PC 마다
+ * 따로 놀던 걸 하나로 합쳐 어느 PC에서든 같은 목록이 보이게 한다.
+ * 트리 조작 함수(addFolder, upsertItem 등)는 저장 방식과 무관한 순수 함수라
+ * 그대로 뒀다 — 그래야 테스트할 수 있다.
  *
  * ★서버 IP/계정은 저장하지 않는다★
  *   접속 순간에 서버 config(.env)에서 받아온다. 여기 박아두면 서버 주소가
  *   바뀔 때 저장된 항목이 전부 낡은 값이 된다.
  */
 import { invoke } from "@tauri-apps/api/core"
+import { getFavoritesRaw, saveFavoritesRaw } from "./api"
 
 export type ConnectMode = "solo" | "group"
 export type SessionMode = "file" | "builder"
@@ -284,20 +287,63 @@ export function allFolders(s: FavStore): string[] {
 }
 
 /* ------------------------------------------------------------------ */
-/* 저장소 입출력                                                        */
+/* 저장소 입출력 — 서버(features/favorites.json)                        */
 /* ------------------------------------------------------------------ */
 
+function isEmptyStore(raw: string): boolean {
+  const { store } = parseStore(raw)
+  return store.items.length === 0 && store.folders.length === 0 && store.commands.length === 0
+}
+
+/**
+ * PC 로컬(옛 Tauri favorites.json) -> 서버 1회성 이전.
+ *
+ * ★두 가지 사고를 동시에 막아야 한다★
+ *   1) 서버에 이미 데이터가 있는데 다른 PC의 로컬 값으로 덮어써 날리는 것
+ *      -> 서버가 "비어있을 때"만 이전한다.
+ *   2) 즐겨찾기가 없는 새 PC(빈 로컬)를 먼저 실행해서 서버를 빈 채로
+ *      "초기화"해버리는 것 -> 로컬이 비어있으면 아예 서버를 건드리지 않는다.
+ *
+ *   즉 "서버 비어있음 AND 로컬에 실제 내용 있음" 일 때만 올린다.
+ *   세션(모듈 로드) 동안 한 번만 시도한다 — 여러 화면이 동시에 loadFavorites
+ *   를 불러도 두 번 올라가지 않게 프라미스를 캐시한다.
+ */
+let migrateOnce: Promise<void> | null = null
+
+function migrateLocalToServer(): Promise<void> {
+  if (!migrateOnce) {
+    migrateOnce = (async () => {
+      let serverRaw: string
+      try {
+        serverRaw = await getFavoritesRaw()
+      } catch {
+        return // 서버 확인 자체가 실패하면 이전 시도하지 않는다
+      }
+      if (!isEmptyStore(serverRaw)) return // 서버에 이미 데이터가 있다 — 손대지 않는다
+
+      let localRaw = ""
+      try {
+        localRaw = await invoke<string>("favorites_load")
+      } catch {
+        return // 데스크톱 앱이 아니거나 로컬 파일이 없을 수 있다 — 정상
+      }
+      if (isEmptyStore(localRaw)) return // 이 PC 는 빈 로컬 — 서버를 초기화하지 않는다
+
+      await saveFavoritesRaw(localRaw)
+      console.info("[즐겨찾기] 로컬 -> 서버 이전 완료")
+    })()
+  }
+  return migrateOnce
+}
+
 export async function loadFavorites(): Promise<{ store: FavStore; warning: string | null }> {
-  const raw = await invoke<string>("favorites_load")
+  await migrateLocalToServer()
+  const raw = await getFavoritesRaw()
   return parseStore(raw)
 }
 
-export async function saveFavorites(s: FavStore): Promise<string> {
-  return invoke<string>("favorites_save", { json: JSON.stringify(s, null, 2) })
-}
-
-export async function favoritesPath(): Promise<string> {
-  return invoke<string>("favorites_path")
+export async function saveFavorites(s: FavStore): Promise<void> {
+  await saveFavoritesRaw(JSON.stringify(s))
 }
 
 /* ------------------------------------------------------------------ */

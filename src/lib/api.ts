@@ -248,6 +248,19 @@ export async function saveDoc(key: string, content: string): Promise<DocContent>
   })
 }
 
+// ---- 접속 즐겨찾기 (favorites.json, 서버 저장 — PC 간 공유) ----
+export async function getFavoritesRaw(): Promise<string> {
+  const d = await request<{ ok: boolean; content: string }>("/api/favorites")
+  return d.content ?? ""
+}
+
+export async function saveFavoritesRaw(content: string): Promise<void> {
+  await request<{ ok: boolean }>("/api/favorites", {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  })
+}
+
 // ---- tin 파일 관리 (1단계: 읽기 + 편집/저장) ----
 // ★이 경로는 서버에서 tmux #read 를 보내지 않는다★
 //   저장은 파일 + 백업까지만이고, 게임 세션에는 다음 재접속 때 적용된다.
