@@ -64,6 +64,7 @@ import { StatsView } from "@/components/stats-view"
 import { ReferencePanel } from "@/components/reference-panel"
 import { FilesView } from "@/components/files-view"
 import { ComboView } from "@/components/combo-view"
+import { GroupDocView } from "@/components/group-doc-view"
 
 type ViewId =
   | TableType
@@ -74,11 +75,22 @@ type ViewId =
   | "files"
   | "combo"
   | "groups"
+  | "doc-한비광그룹"
+  | "doc-천마신군그룹"
+
+/** 그룹별 참고서 메뉴 id -> 서버 docs/<이름>.md 의 이름 */
+const GROUP_DOCS: Record<string, string> = {
+  "doc-한비광그룹": "한비광그룹",
+  "doc-천마신군그룹": "천마신군그룹",
+}
 
 type MenuItem = { id: ViewId; label: string; icon: typeof Zap }
 
 /** 자주 쓰는 메뉴 — 항상 펼쳐져 있다 */
 const MENU: MenuItem[] = [
+  // 그룹별 운영 참고서 — 우측 [참고서] 패널과 같은 BookOpen 아이콘을 쓴다
+  { id: "doc-한비광그룹", label: "한비광그룹", icon: BookOpen },
+  { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
   { id: "files", label: "파일 관리", icon: FolderCog },
   { id: "combo", label: "접속 빌더", icon: Plug },
   { id: "groups", label: "캐릭터 그룹", icon: Users },
@@ -495,6 +507,9 @@ export default function App() {
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView openFile={openFile} />}
           {view === "combo" && <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />}
+          {GROUP_DOCS[view] && (
+            <GroupDocView key={view} docKey={GROUP_DOCS[view]} />
+          )}
           {view === "groups" && (
             <GroupsView
               onOpenFile={(name) => {

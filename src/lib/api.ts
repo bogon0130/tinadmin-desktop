@@ -240,6 +240,14 @@ export async function getDoc(key: string): Promise<DocContent> {
   return request<DocContent>(`/api/docs/${encodeURIComponent(key)}`)
 }
 
+/** 문서를 덮어쓴다. 서버는 docs/ 안에 이미 있는 문서만 받아준다. */
+export async function saveDoc(key: string, content: string): Promise<DocContent> {
+  return request<DocContent>(`/api/docs/${encodeURIComponent(key)}`, {
+    method: "POST",
+    body: JSON.stringify({ content }),
+  })
+}
+
 // ---- tin 파일 관리 (1단계: 읽기 + 편집/저장) ----
 // ★이 경로는 서버에서 tmux #read 를 보내지 않는다★
 //   저장은 파일 + 백업까지만이고, 게임 세션에는 다음 재접속 때 적용된다.
