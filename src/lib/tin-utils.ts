@@ -297,13 +297,4 @@ export function nextTempId(entries: TinEntry[]): number {
   return min - 1
 }
 
-/** Raw 편집 탭에 보여줄 항목들 (원본 블록 + 주석). 꺼진 항목 주석은 제외. */
-export function rawEntries(entries: TinEntry[]): TinEntry[] {
-  return entries.filter((e) => {
-    if (e.type === "raw") return true
-    if (e.type === "comment") return parseOffComment(e.text) === null
-    return false
-  })
-}
-
 export { isGroupType }

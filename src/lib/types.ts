@@ -69,9 +69,3 @@ export interface Row {
   /** false면 #nop [OFF] 로 주석 처리된 상태 */
   enabled: boolean
 }
-
-export interface Preset {
-  name: string
-  description?: string
-  entries?: TinEntry[]
-}

@@ -1,4 +1,4 @@
-import type { Preset, TinEntry } from "./types"
+import type { TinEntry } from "./types"
 
 const URL_KEY = "tinadmin.apiUrl"
 const TOKEN_KEY = "tinadmin.token"
@@ -117,19 +117,6 @@ export interface ResumeResult {
 
 export async function resume(): Promise<ResumeResult> {
   return request<ResumeResult>("/api/resume", { method: "POST" })
-}
-
-export async function getPresets(): Promise<Preset[]> {
-  const data = await request<{ ok: boolean; presets: Preset[] }>("/api/presets")
-  return data.presets ?? []
-}
-
-export async function savePreset(preset: Preset): Promise<Preset[]> {
-  const data = await request<{ ok: boolean; presets: Preset[] }>("/api/presets", {
-    method: "POST",
-    body: JSON.stringify(preset),
-  })
-  return data.presets ?? []
 }
 
 export async function getNotes(): Promise<string> {
@@ -688,45 +675,6 @@ export async function sendCommand(
     method: "POST",
     body: JSON.stringify({ session, window, command }),
   })
-}
-
-// ---- 캐릭터 그룹 ----
-export interface GroupStatsChar {
-  name: string
-  attached: boolean
-  has_log: boolean
-}
-
-export interface GroupCharacter {
-  name: string
-  live: boolean
-  /** #read 사슬까지 따라간 전체 tin 목록 */
-  files: string[]
-  /** FILE_TARGETS 로 직접 매핑된 tin */
-  direct_files: string[]
-  has_stats: boolean
-  stats_logged: boolean
-}
-
-export interface CharGroup {
-  characters: GroupCharacter[]
-  name: string
-  session: string
-  dir: string
-  windows: string[]
-  /** tmux 세션이 실제로 떠 있는지 */
-  live: boolean
-  live_windows: string[]
-  /** 등록됐지만 실제로 없는 창 */
-  missing_windows: string[]
-  /** 실제로 있지만 등록되지 않은 창 */
-  extra_windows: string[]
-  files: string[]
-  stats_chars: GroupStatsChar[]
-}
-
-export async function fetchGroups(): Promise<{ groups: CharGroup[] }> {
-  return request<{ groups: CharGroup[] }>("/api/groups")
 }
 
 // ---- 접속 조합 빌더 ----

@@ -59,8 +59,6 @@ pub fn run() {
             favorites::favorites_load,
             favorites::favorites_save,
             favorites::favorites_path,
-            favorites::quickcmds_load,
-            favorites::quickcmds_save,
             favorites::textsnips_load,
             favorites::textsnips_save,
             favorites::charnotes_load,

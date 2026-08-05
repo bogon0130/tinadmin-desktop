@@ -15,8 +15,6 @@ use std::path::PathBuf;
 use tauri::Manager;
 
 const FILE_NAME: &str = "favorites.json";
-/// 명령 즐겨찾기 (살아있는 창에 바로 보내는 명령 목록)
-const CMD_FILE_NAME: &str = "quick_commands.json";
 /// 양식 즐겨찾기 (편집 중인 tin 파일에 끼워 넣는 텍스트 목록)
 const SNIP_FILE_NAME: &str = "text_snippets.json";
 /// 캐릭터별 메모/할일
@@ -62,18 +60,6 @@ fn load_json(app: &tauri::AppHandle, file: &str) -> Result<String, String> {
         return Ok(String::new());
     }
     fs::read_to_string(&path).map_err(|e| format!("읽지 못했습니다: {}", e))
-}
-
-/// 명령 즐겨찾기 읽기 — 파일이 없으면 빈 문자열.
-#[tauri::command]
-pub fn quickcmds_load(app: tauri::AppHandle) -> Result<String, String> {
-    load_json(&app, CMD_FILE_NAME)
-}
-
-/// 명령 즐겨찾기 저장.
-#[tauri::command]
-pub fn quickcmds_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
-    save_json(&app, CMD_FILE_NAME, json)
 }
 
 /// 양식 즐겨찾기 읽기 — 파일이 없으면 빈 문자열.
