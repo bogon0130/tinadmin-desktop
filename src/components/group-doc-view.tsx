@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react"
-import { Loader2, Pencil, RefreshCw, Save } from "lucide-react"
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Loader2, MonitorPlay, Pencil, RefreshCw, Save, Terminal } from "lucide-react"
 import { toast } from "sonner"
 
 import { getDoc, saveDoc, type DocContent } from "@/lib/api"
 import { renderMarkdown } from "@/lib/markdown"
+import { parseGroupSummary } from "@/lib/group-doc"
 
 /**
  * 그룹별 운영 참고서 화면 (한비광그룹 / 천마신군그룹).
@@ -23,6 +24,10 @@ export function GroupDocView({ docKey }: { docKey: string }) {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // 상단 요약 — 문서에서 읽어올 뿐 문서를 고치지 않는다.
+  // 못 찾으면 조용히 비고, 그때는 메뉴 이름을 제목으로 쓴다.
+  const summary = useMemo(() => parseGroupSummary(doc?.content ?? ""), [doc])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -63,6 +68,55 @@ export function GroupDocView({ docKey }: { docKey: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col p-5">
+      {/* 그룹 요약 — 세션명과 창 수는 재접속할 때 매번 확인하는 값이라 늘 보이게 둔다 */}
+      <div
+        className="mb-4 shrink-0 rounded-lg border p-4"
+        style={{
+          borderColor: "var(--tin-edge)",
+          background:
+            "linear-gradient(90deg, rgb(var(--tin-accent-rgb) / 0.10), transparent 70%)",
+        }}
+      >
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <h2
+            className="tin-accent font-bold tracking-wide"
+            style={{ fontSize: "var(--tin-fs-xl)" }}
+          >
+            {summary.title || docKey}
+          </h2>
+
+          {summary.session && (
+            <span
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1"
+              style={{
+                borderColor: "var(--tin-edge)",
+                background: "var(--tin-panel2)",
+                fontSize: "var(--tin-fs-sm)",
+              }}
+            >
+              <Terminal className="tin-accent size-3.5" />
+              <span style={{ opacity: 0.7 }}>세션</span>
+              <b className="tin-mono">{summary.session}</b>
+            </span>
+          )}
+
+          {summary.windows !== null && (
+            <span
+              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1"
+              style={{
+                borderColor: "var(--tin-edge)",
+                background: "var(--tin-panel2)",
+                fontSize: "var(--tin-fs-sm)",
+              }}
+            >
+              <MonitorPlay className="tin-accent size-3.5" />
+              <span style={{ opacity: 0.7 }}>창</span>
+              <b className="tin-mono">{summary.windows}개</b>
+            </span>
+          )}
+        </div>
+      </div>
+
       <div className="mb-3 flex items-center gap-2">
         <p className="text-[12px] text-muted-foreground">
           서버 <code className="font-mono-tin">docs/{docKey}.md</code> 를 보여준다.
@@ -145,9 +199,12 @@ export function GroupDocView({ docKey }: { docKey: string }) {
           className="font-mono-tin tin-scroll min-h-0 flex-1 resize-none rounded-lg border border-input bg-background p-4 text-[13px] leading-relaxed text-foreground outline-none focus:border-primary"
         />
       ) : doc ? (
-        <div className="tin-scroll min-h-0 flex-1 overflow-y-auto rounded-lg border border-input bg-background px-5 py-4">
-          <div className="markdown-body">{renderMarkdown(doc.content)}</div>
-          <div className="mt-6 border-t border-input pt-2 text-[11px] text-muted-foreground">
+        <div className="tin-scroll min-h-0 flex-1 overflow-y-auto rounded-lg border border-input bg-background px-8 py-7">
+          {/* 긴 줄이 화면 끝까지 늘어나면 눈이 되돌아올 자리를 잃는다 */}
+          <div className="markdown-body mx-auto max-w-4xl">
+            {renderMarkdown(doc.content)}
+          </div>
+          <div className="mx-auto mt-8 max-w-4xl border-t border-input pt-3 text-[11px] text-muted-foreground">
             {doc.name} · 갱신 {doc.mtime}
           </div>
         </div>

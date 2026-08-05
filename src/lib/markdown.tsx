@@ -1,4 +1,5 @@
-import { Fragment, type ReactNode } from "react"
+import { Fragment, useState, type ReactNode } from "react"
+import { Check, Copy } from "lucide-react"
 
 /**
  * 아주 작은 마크다운 렌더러 (참고서 패널용).
@@ -15,6 +16,52 @@ import { Fragment, type ReactNode } from "react"
  * 파싱이 애매한 줄은 버리지 않고 문단으로 출력해서 내용이 유실되지 않게 한다.
  */
 
+/**
+ * 코드블록 — 오른쪽 위에 복사 버튼을 얹는다.
+ *
+ * 참고서에 든 건 대부분 tmux/tt++ 명령이라 "읽는 것"보다 "그대로 실행하는 것"이
+ * 목적이다. 손으로 옮겨 적다 오타가 나면 엉뚱한 창을 죽일 수 있어서 복사를 붙였다.
+ */
+function CodeBlock({ text }: { text: string }) {
+  const [done, setDone] = useState(false)
+
+  async function copy() {
+    let ok = false
+    try {
+      await navigator.clipboard.writeText(text)
+      ok = true
+    } catch {
+      // Tauri 웹뷰에서 clipboard API 가 막히면 구형 경로로 시도한다
+      try {
+        const ta = document.createElement("textarea")
+        ta.value = text
+        ta.style.position = "fixed"
+        ta.style.left = "-9999px"
+        document.body.appendChild(ta)
+        ta.select()
+        ok = document.execCommand("copy")
+        document.body.removeChild(ta)
+      } catch {
+        ok = false
+      }
+    }
+    if (ok) {
+      setDone(true)
+      setTimeout(() => setDone(false), 1200)
+    }
+  }
+
+  return (
+    <div className="md-pre-wrap">
+      <pre className="md-pre tin-mono tin-scroll">{text}</pre>
+      <button onClick={() => void copy()} className="md-copy" title="복사">
+        {done ? <Check className="size-3" /> : <Copy className="size-3" />}
+        {done ? "복사됨" : "복사"}
+      </button>
+    </div>
+  )
+}
+
 /** 인라인: `코드`, **굵게** 만 처리 */
 function inline(text: string, keyBase: string): ReactNode[] {
   const out: ReactNode[] = []
@@ -24,14 +71,7 @@ function inline(text: string, keyBase: string): ReactNode[] {
   parts.forEach((part, i) => {
     if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
       out.push(
-        <code
-          key={`${keyBase}-c${i}`}
-          className="tin-mono rounded px-1 py-0.5"
-          style={{
-            background: "rgb(var(--tin-accent-rgb) / 0.12)",
-            color: "var(--tin-accent)",
-          }}
-        >
+        <code key={`${keyBase}-c${i}`} className="md-code tin-mono">
           {part.slice(1, -1)}
         </code>,
       )
@@ -80,11 +120,9 @@ export function renderMarkdown(src: string): ReactNode[] {
     const items = [...listBuf]
     listBuf = []
     out.push(
-      <ul key={`ul-${key++}`} className="mb-3 space-y-1.5 pl-4">
+      <ul key={`ul-${key++}`} className="md-ul">
         {items.map((t, n) => (
-          <li key={n} className="list-disc leading-relaxed">
-            {inline(t, `li-${key}-${n}`)}
-          </li>
+          <li key={n}>{inline(t, `li-${key}-${n}`)}</li>
         ))}
       </ul>,
     )
@@ -95,7 +133,7 @@ export function renderMarkdown(src: string): ReactNode[] {
     const text = paraBuf.join(" ")
     paraBuf = []
     out.push(
-      <p key={`p-${key++}`} className="mb-3 leading-relaxed">
+      <p key={`p-${key++}`} className="md-p">
         {inline(text, `p-${key}`)}
       </p>,
     )
@@ -127,18 +165,7 @@ export function renderMarkdown(src: string): ReactNode[] {
         i++
       }
       i++ // 닫는 ``` 건너뛰기
-      out.push(
-        <pre
-          key={`pre-${key++}`}
-          className="tin-mono tin-scroll mb-3 overflow-x-auto rounded-md border p-3 leading-snug"
-          style={{
-            borderColor: "var(--tin-edge)",
-            background: "var(--tin-panel2)",
-          }}
-        >
-          {body.join("\n")}
-        </pre>,
-      )
+      out.push(<CodeBlock key={`pre-${key++}`} text={body.join("\n")} />)
       continue
     }
 
@@ -148,29 +175,14 @@ export function renderMarkdown(src: string): ReactNode[] {
       flushAll()
       const level = h[1].length
       const text = h[2]
-      const size =
-        level === 1 ? "var(--tin-fs-lg)" : level === 2 ? "var(--tin-fs)" : "var(--tin-fs-sm)"
+      // 크기/여백/구분선은 CSS(.md-h1~3)가 맡는다. 여기서는 위계만 정한다.
+      // div 대신 진짜 제목 태그를 쓰면 화면 낭독기에서도 구조가 읽힌다.
+      const Tag = (level === 1 ? "h1" : level === 2 ? "h2" : "h3") as "h1" | "h2" | "h3"
       out.push(
-        <div
-          key={`h-${key++}`}
-          className="tin-accent mt-4 mb-2 font-bold tracking-wide first:mt-0"
-          style={{ fontSize: size }}
-        >
+        <Tag key={`h-${key++}`} className={`md-h${level}`}>
           {inline(text, `h-${key}`)}
-        </div>,
+        </Tag>,
       )
-      if (level <= 2) {
-        out.push(
-          <div
-            key={`hr-${key++}`}
-            className="mb-2 h-px"
-            style={{
-              background:
-                "linear-gradient(90deg, var(--tin-edge), transparent)",
-            }}
-          />,
-        )
-      }
       i++
       continue
     }
@@ -186,18 +198,12 @@ export function renderMarkdown(src: string): ReactNode[] {
         i++
       }
       out.push(
-        <div
-          key={`tw-${key++}`}
-          className="tin-scroll mb-3 overflow-x-auto rounded-md border"
-          style={{ borderColor: "var(--tin-edge)" }}
-        >
-          <table className="hud-table tin-mono">
+        <div key={`tw-${key++}`} className="md-table-wrap tin-scroll">
+          <table className="md-table tin-mono">
             <thead>
               <tr>
                 {head.map((c, n) => (
-                  <th key={n} className="c1">
-                    {inline(c, `th-${key}-${n}`)}
-                  </th>
+                  <th key={n}>{inline(c, `th-${key}-${n}`)}</th>
                 ))}
               </tr>
             </thead>
@@ -205,9 +211,7 @@ export function renderMarkdown(src: string): ReactNode[] {
               {rows.map((r, rn) => (
                 <tr key={rn}>
                   {head.map((_, cn) => (
-                    <td key={cn} className="c1">
-                      {inline(r[cn] ?? "", `td-${key}-${rn}-${cn}`)}
-                    </td>
+                    <td key={cn}>{inline(r[cn] ?? "", `td-${key}-${rn}-${cn}`)}</td>
                   ))}
                 </tr>
               ))}
@@ -227,14 +231,7 @@ export function renderMarkdown(src: string): ReactNode[] {
         i++
       }
       out.push(
-        <blockquote
-          key={`bq-${key++}`}
-          className="mb-3 rounded-r-md border-l-2 py-2 pl-3 pr-2 leading-relaxed"
-          style={{
-            borderColor: "var(--tin-accent)",
-            background: "rgb(var(--tin-accent-rgb) / 0.08)",
-          }}
-        >
+        <blockquote key={`bq-${key++}`} className="md-quote">
           {inline(body.join(" "), `bq-${key}`)}
         </blockquote>,
       )
