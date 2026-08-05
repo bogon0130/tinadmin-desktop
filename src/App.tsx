@@ -10,6 +10,7 @@ import {
   OctagonX,
   Play,
   Settings,
+  Star,
   Terminal,
 } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -39,8 +40,11 @@ import { FilesView } from "@/components/files-view"
 import { ComboView } from "@/components/combo-view"
 import { GroupDocView } from "@/components/group-doc-view"
 import { GuideView } from "@/components/guide-view"
+import { FavoritesPanel } from "@/components/favorites-panel"
+import { QuickFavoritesPanel } from "@/components/quick-favorites-panel"
 
 type ViewId =
+  | "favorites"
   | "guide"
   | "notes"
   | "stats"
@@ -59,6 +63,8 @@ type MenuItem = { id: ViewId; label: string; icon: typeof BookOpen }
 
 /** 왼쪽 메뉴 — 전부 항상 펼쳐져 있다 */
 const MENU: MenuItem[] = [
+  // 클릭 한 번으로 저장된 방식대로 접속한다 — 가장 자주 쓰므로 맨 위
+  { id: "favorites", label: "즐겨찾기", icon: Star },
   // 그룹별 운영 참고서
   { id: "doc-한비광그룹", label: "한비광그룹", icon: BookOpen },
   { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
@@ -71,7 +77,9 @@ const MENU: MenuItem[] = [
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()))
-  const [view, setView] = useState<ViewId>("files")
+  const [view, setView] = useState<ViewId>("favorites")
+  // 접속 빌더에서 즐겨찾기를 저장하면 이 값을 올려 목록을 다시 읽게 한다
+  const [favReload, setFavReload] = useState(0)
   // 왼쪽 사이드바 폭 — 경계를 끌어 조절하고 재시작해도 유지된다.
   const [navW, setNavW] = usePanelWidth("tin.nav.width", 288, 200, 560)
   const [showSettings, setShowSettings] = useState(false)
@@ -249,10 +257,24 @@ export default function App() {
 
         {/* 콘텐츠 */}
         <div className="flex min-h-0 flex-1">
+          {view === "favorites" && (
+            <>
+              {/* 왼쪽: 접속 즐겨찾기 트리 — 누르면 PowerShell 로 SSH 접속 */}
+              <div className="tin-scroll min-h-0 flex-1 overflow-y-auto p-5">
+                <div className="mx-auto max-w-3xl">
+                  <FavoritesPanel reloadKey={favReload} />
+                </div>
+              </div>
+              {/* 오른쪽: 원클릭 명령 — 지금 보고 있는 게임 창으로 바로 전송 */}
+              <QuickFavoritesPanel />
+            </>
+          )}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView />}
-          {view === "combo" && <ComboView />}
+          {view === "combo" && (
+            <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />
+          )}
           {view === "guide" && <GuideView />}
           {GROUP_DOCS[view] && (
             <GroupDocView key={view} docKey={GROUP_DOCS[view]} />
