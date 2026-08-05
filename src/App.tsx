@@ -42,11 +42,11 @@ import { GroupDocView } from "@/components/group-doc-view"
 import { GuideView } from "@/components/guide-view"
 import { FavoritesView } from "@/components/favorites-view"
 import {
-  UI_THEMES,
-  applyUiTheme,
-  loadUiTheme,
-  type UiTheme,
-} from "@/lib/ui-theme"
+  UI_STYLES,
+  applyUiStyle,
+  loadUiStyle,
+  type UiStyle,
+} from "@/lib/ui-style"
 
 type ViewId =
   | "favorites"
@@ -90,14 +90,14 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
   const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
-  // [임시 — 톤 확정 후 제거] A/B 시안 비교용 스위치
-  const [uiTheme, setUiTheme] = useState<UiTheme>(() => loadUiTheme())
+  // [임시 — 스타일 확정 후 제거] S1~S4 시안 비교용 스위치
+  const [uiStyle, setUiStyle] = useState<UiStyle>(() => loadUiStyle())
 
   // 저장된 화면 설정을 시작할 때 적용 (다음 실행에도 유지)
   useEffect(() => {
     applyTheme(loadTheme())
-    // UI 테마가 글자색/강조색을 덮어써야 하므로 나중에 적용한다
-    applyUiTheme(loadUiTheme(), false)
+    // 스타일이 글자색/강조색/폰트를 덮어써야 하므로 나중에 적용한다
+    applyUiStyle(loadUiStyle(), false)
   }, [])
 
   async function handleStopAll() {
@@ -194,30 +194,32 @@ export default function App() {
         </div>
 
         <div className="border-t border-sidebar-border p-2">
-          {/* [임시 — 톤 확정 후 이 블록 통째로 제거] 색상 시안 A/B 비교 */}
-          <div className="mb-1 flex items-center gap-1.5 px-3 py-1.5">
-            <span className="ui-sub shrink-0">색상 시안</span>
+          {/* [임시 — 스타일 확정 후 이 블록 통째로 제거] 디자인 시안 S1~S4 비교 */}
+          <div className="px-3 py-1.5">
+            <div className="ty-sub" style={{ marginBottom: 6 }}>
+              디자인 시안
+            </div>
             <div
-              className="ml-auto flex overflow-hidden rounded-md border"
+              className="flex overflow-hidden rounded-md border"
               style={{ borderColor: "var(--border)" }}
             >
-              {UI_THEMES.map((t) => {
-                const on = uiTheme === t.id
+              {UI_STYLES.map((s) => {
+                const on = uiStyle === s.id
                 return (
                   <button
-                    key={t.id}
+                    key={s.id}
                     onClick={() => {
-                      setUiTheme(t.id)
-                      applyUiTheme(t.id)
+                      setUiStyle(s.id)
+                      applyUiStyle(s.id)
                     }}
-                    title={t.hint}
-                    className="px-2.5 py-1 text-[11px] font-semibold transition"
+                    title={s.hint}
+                    className="flex-1 py-1 text-[11px] font-semibold transition"
                     style={{
                       background: on ? "var(--accent)" : "transparent",
-                      color: on ? "var(--accent-contrast)" : "var(--text)",
+                      color: on ? "var(--accent-contrast)" : "var(--nav-text)",
                     }}
                   >
-                    {t.label}
+                    {s.label}
                   </button>
                 )
               })}

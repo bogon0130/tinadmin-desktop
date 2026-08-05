@@ -2,6 +2,10 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";
+/* Pretendard — 한글+영문 본문 폰트. 시스템 기본(맑은 고딕 등)을 쓰지 않는다.
+   CDN 이 아니라 로컬 번들이다: 이 앱은 오프라인에서도 떠야 하고 CSP 도 걸린다.
+   dynamic-subset 이라 실제로 쓰인 글자 범위만 내려받는다. */
+@import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -505,71 +509,114 @@ body, body * {
 .markdown-body .md-table tbody tr:last-child td { border-bottom: 0; }
 
 /* ============================================================================
-   디자인 토큰 (UI 개편 1단계)
+   디자인 시스템 (UI 개편 2단계)
 
-   화면마다 색을 직접 적던 걸 여기 토큰으로 모은다. 컴포넌트는 토큰만 참조하고
-   실제 색값은 테마(A/B)에서만 정한다 — 색을 바꾸려고 컴포넌트를 뒤지지 않게.
+   결론: 색이 아니라 타이포·여백이 화면 인상을 만든다. 그래서 아래 시스템을
+   먼저 고정하고, 스타일(S1~S4)은 그 위에 색/모서리/그림자 스킨만 갈아끼운다.
 
-   토큰 이름은 역할로 짓는다(--surface, --accent). "네이비", "노랑" 같은 색
-   이름을 쓰면 테마 B 에서 이름과 실제 색이 어긋난다.
-
-   ★기존 --tin-* 변수와의 관계★
-     --tin-fg / --tin-accent 는 설정 패널(theme.ts applyTheme)이 인라인으로
-     주입해서 이 파일의 규칙보다 우선한다. 그래서 A/B 전환 시 lib/ui-theme.ts
-     가 두 값을 테마에 맞게 다시 주입한다. 나머지 --tin-* 는 여기서 토큰에
-     연결해 두면 기존 화면도 자동으로 새 팔레트를 따라온다.
+   ★크기와 간격은 여기 토큰이 전부다★
+     컴포넌트에서 px 를 직접 적으면 화면마다 미묘하게 달라져 "정돈된 느낌"이
+     사라진다. 아래 4단계 밖의 글자 크기는 쓰지 않는다.
    ============================================================================ */
+:root {
+    --font: "Pretendard Variable", Pretendard, "Inter Variable", system-ui, sans-serif;
 
-/* ---- 테마 A — 네이비 + 노랑 ---- */
-:root[data-ui-theme="a"] {
-    --bg: #0f1830;
-    /* "아주 은은한 세로 그라데이션만" — 방사형 glow 는 쓰지 않는다 */
-    --bg-image: linear-gradient(180deg, #131e3a 0%, #0f1830 38%, #0d1529 100%);
+    /* 글자 4단계 — 이 밖의 크기 금지 */
+    --fs-h: 24px;      --fw-h: 700;     /* 화면 제목 */
+    --fs-sec: 16px;    --fw-sec: 600;   /* 섹션 제목 */
+    --fs-body: 14px;   --fw-body: 400;  /* 본문 */
+    --fs-sub: 13px;    --fw-sub: 400;   /* 보조 */
+    --fw-med: 500;                      /* 본문 강조 */
+    --lh: 1.5;
 
-    --surface: #16213f;      /* 카드/패널 — 배경보다 한 단계 밝게 */
-    --surface-2: #1c2a4d;    /* 입력칸·표 헤더처럼 한 겹 더 올라온 면 */
-    --surface-3: #223160;    /* hover / 선택 */
+    /* 여백 */
+    --pad-card: 20px;
+    --gap: 12px;        /* 요소 간격 */
+    --gap-lg: 16px;
+    --gap-sec: 24px;    /* 섹션 간격 */
 
-    --text: #f5f7fa;
-    --accent: #f5c518;
-    --accent-contrast: #1a1400;   /* 강조색 위에 얹는 글자 */
-    --accent-rgb: 245 197 24;
-
-    --border: #2a3a63;
-    --border-soft: #1f2c4d;
-
-    --danger: #e5484d;
-    --danger-contrast: #ffffff;
-
-    --shadow-card: none;     /* 어두운 테마에선 그림자 대신 테두리로 면을 나눈다 */
+    /* 스킨이 덮어쓰는 값의 기본치 */
+    --radius-card: 12px;
+    --card-blur: none;
+    --shadow-card: none;
 }
 
-/* ---- 테마 B — 파스텔 화사 ---- */
-:root[data-ui-theme="b"] {
-    --bg: #f4f2fb;
-    --bg-image: linear-gradient(180deg, #faf8ff 0%, #f4f2fb 45%, #efedf8 100%);
-
-    --surface: #ffffff;
-    --surface-2: #f8f7fd;
-    --surface-3: #eeebfa;
-
-    --text: #26324d;         /* 회색이 아니라 진한 남색 */
-    --accent: #5b8def;
-    --accent-contrast: #ffffff;
-    --accent-rgb: 91 141 239;
-
-    --border: #e0ddef;
-    --border-soft: #ecebf6;
-
-    --danger: #e05a5a;
-    --danger-contrast: #ffffff;
-
-    --shadow-card: 0 1px 2px rgb(38 50 77 / 0.06), 0 2px 8px rgb(38 50 77 / 0.05);
+/* ---------------- S1 — Directory풍: 다크 사이드바 + 라이트 본문 ---------------- */
+:root[data-ui-style="s1"] {
+    --bg: #f4f5f8;  --bg-image: none;
+    --surface: #ffffff;  --surface-2: #f7f8fb;  --surface-3: #eef0f6;
+    --text: #1f2733;
+    --accent: #6b5bd2;  --accent-contrast: #ffffff;
+    --border: #e3e6ed;  --border-soft: #eef0f5;
+    --danger: #d64545;  --danger-contrast: #ffffff;
+    --radius-card: 10px;
+    --shadow-card: none;
+    /* 사이드바만 진한 남색 */
+    --nav-bg: #1e2749;  --nav-text: #e9ebf4;  --nav-border: #2a3459;
+    --nav-hover: #27325c;
+    --nav-active-bg: var(--accent);  --nav-active-text: #ffffff;
 }
 
-/* ---- 토큰 -> 기존 변수 매핑 ----
-   이 한 블록 덕분에 아직 손대지 않은 화면도 새 팔레트를 따라온다. */
-:root[data-ui-theme] {
+/* ---------------- S2 — 부동산풍: 전체 라이트, 큰 라운드, 그림자로 분리 ---------------- */
+:root[data-ui-style="s2"] {
+    --bg: #f2f4f7;  --bg-image: none;
+    --surface: #ffffff;  --surface-2: #f7f9fc;  --surface-3: #eef2f8;
+    --text: #1b2430;
+    --accent: #3b7ddd;  --accent-contrast: #ffffff;
+    /* 테두리를 거의 지우고 그림자와 여백으로 면을 나눈다 */
+    --border: #eef1f5;  --border-soft: #f4f6f9;
+    --danger: #d9534f;  --danger-contrast: #ffffff;
+    --radius-card: 18px;
+    --shadow-card: 0 1px 2px rgb(27 36 48 / 0.05), 0 10px 28px rgb(27 36 48 / 0.06);
+    --nav-bg: #ffffff;  --nav-text: #1b2430;  --nav-border: #eef1f5;
+    --nav-hover: #f2f4f7;
+    --nav-active-bg: color-mix(in srgb, var(--accent) 12%, transparent);
+    --nav-active-text: var(--accent);
+}
+
+/* ---------------- S3 — Commerce풍: 대시보드 정석, 상단 요약 카드 ---------------- */
+:root[data-ui-style="s3"] {
+    --bg: #f6f7f9;  --bg-image: none;
+    --surface: #ffffff;  --surface-2: #f8fafb;  --surface-3: #edf3f2;
+    --text: #17212b;
+    --accent: #0f8a80;  --accent-contrast: #ffffff;   /* 절제된 틸 */
+    --border: #e6e9ee;  --border-soft: #f0f2f5;
+    --danger: #cf4b4b;  --danger-contrast: #ffffff;
+    --radius-card: 10px;
+    --shadow-card: 0 1px 2px rgb(23 33 43 / 0.05);
+    --nav-bg: #ffffff;  --nav-text: #17212b;  --nav-border: #e6e9ee;
+    --nav-hover: #f2f5f4;
+    --nav-active-bg: color-mix(in srgb, var(--accent) 12%, transparent);
+    --nav-active-text: var(--accent);
+}
+
+/* ---------------- S4 — Lifestats풍: 다크 + 글래스 카드 ---------------- */
+:root[data-ui-style="s4"] {
+    --bg: #0e0f13;
+    --bg-image:
+        radial-gradient(900px 480px at 12% -8%, rgb(167 139 250 / 0.16), transparent 60%),
+        radial-gradient(700px 420px at 95% 8%, rgb(255 255 255 / 0.05), transparent 62%);
+    /* 반투명 + 블러 = 글래스모피즘 */
+    --surface: rgb(255 255 255 / 0.055);
+    --surface-2: rgb(255 255 255 / 0.035);
+    --surface-3: rgb(255 255 255 / 0.10);
+    --text: #eceef3;
+    --accent: #a78bfa;  --accent-contrast: #17121f;
+    --border: rgb(255 255 255 / 0.10);
+    --border-soft: rgb(255 255 255 / 0.06);
+    --danger: #f87171;  --danger-contrast: #1b0e0e;
+    --radius-card: 20px;
+    --card-blur: blur(14px);
+    --shadow-card: 0 8px 32px rgb(0 0 0 / 0.36);
+    --nav-bg: rgb(255 255 255 / 0.04);  --nav-text: #eceef3;
+    --nav-border: rgb(255 255 255 / 0.08);
+    --nav-hover: rgb(255 255 255 / 0.07);
+    --nav-active-bg: color-mix(in srgb, var(--accent) 22%, transparent);
+    --nav-active-text: #ffffff;
+}
+
+/* ---- 토큰 -> 기존 --tin-* / shadcn 매핑 (손대지 않은 화면도 따라오게) ---- */
+:root[data-ui-style] {
     --tin-bg: var(--bg);
     --tin-panel: var(--surface);
     --tin-panel2: var(--surface-2);
@@ -591,59 +638,129 @@ body, body * {
     --accent-foreground: var(--text);
     --destructive: var(--danger);
     --destructive-foreground: var(--danger-contrast);
-    /* --border 는 위 테마 블록에서 이미 정의한 토큰 그대로 쓴다
-       (shadcn 의 --border 와 이름이 같아서 다시 대입하면 순환 참조가 된다) */
+    /* --border 는 위 스킨에서 정의한 토큰 그대로 (다시 대입하면 순환 참조) */
     --input: var(--border);
     --ring: var(--accent);
 
-    --sidebar: var(--surface);
-    --sidebar-foreground: var(--text);
+    --sidebar: var(--nav-bg);
+    --sidebar-foreground: var(--nav-text);
     --sidebar-primary: var(--accent);
     --sidebar-primary-foreground: var(--accent-contrast);
-    --sidebar-accent: var(--surface-3);
-    --sidebar-accent-foreground: var(--text);
-    --sidebar-border: var(--border);
+    --sidebar-accent: var(--nav-hover);
+    --sidebar-accent-foreground: var(--nav-text);
+    --sidebar-border: var(--nav-border);
     --sidebar-ring: var(--accent);
+
+    --radius: 10px;
 }
 
-/* html 자신이 :root 라서 ":root html" 은 매칭되지 않는다 — 따로 적는다 */
-:root[data-ui-theme],
-:root[data-ui-theme] body {
-    background: var(--bg-image), var(--bg);
+:root[data-ui-style],
+:root[data-ui-style] body {
+    background: var(--bg-image, none), var(--bg);
     color: var(--text);
+    font-family: var(--font);
+    font-size: var(--fs-body);
+    line-height: var(--lh);
+    letter-spacing: 0;
 }
 
-/* ---- 덜 중요한 글자: 회색으로 바꾸지 않고 같은 색을 옅게 ----
-   회색을 쓰면 테마 B(밝은 배경)에서 읽기 어려워진다. opacity 대신
-   color-mix 를 쓰는 이유: opacity 는 자식 요소까지 흐려진다. */
-:root[data-ui-theme] .text-muted-foreground,
-:root[data-ui-theme] .t-dim {
+/* 덜 중요한 글자: 회색이 아니라 본문색을 옅게.
+   opacity 는 자식까지 흐려지므로 color-mix 를 쓴다. */
+:root[data-ui-style] .text-muted-foreground,
+:root[data-ui-style] .t-dim {
     color: color-mix(in srgb, var(--text) 70%, transparent);
 }
-:root[data-ui-theme] .t-dim-strong {
-    color: color-mix(in srgb, var(--text) 85%, transparent);
-}
 
-/* ---- 공통 표면 유틸 ---- */
+/* ---------------- 타이포 4단계 (이 클래스 밖의 크기 금지) ---------------- */
+.ty-h    { font-size: var(--fs-h);    font-weight: var(--fw-h);    line-height: 1.3; color: var(--text); }
+.ty-sec  { font-size: var(--fs-sec);  font-weight: var(--fw-sec);  line-height: 1.4; color: var(--text); }
+.ty-body { font-size: var(--fs-body); font-weight: var(--fw-body); line-height: var(--lh); color: var(--text); }
+.ty-med  { font-size: var(--fs-body); font-weight: var(--fw-med);  line-height: var(--lh); color: var(--text); }
+.ty-sub  { font-size: var(--fs-sub);  font-weight: var(--fw-sub);  line-height: var(--lh);
+           color: color-mix(in srgb, var(--text) 70%, transparent); }
+/* 숫자는 굵게 — 굵기 대비로 위계를 준다 */
+.ty-num  { font-size: var(--fs-h); font-weight: var(--fw-h); line-height: 1.2;
+           font-variant-numeric: tabular-nums; color: var(--text); }
+
+/* ---------------- 면(카드) / 간격 ---------------- */
 .ui-card {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 10px;
+    border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
+    backdrop-filter: var(--card-blur);
+    -webkit-backdrop-filter: var(--card-blur);
+    padding: var(--pad-card);
 }
 .ui-card-2 {
     background: var(--surface-2);
     border: 1px solid var(--border-soft);
-    border-radius: 10px;
+    border-radius: calc(var(--radius-card) - 4px);
+    backdrop-filter: var(--card-blur);
+    -webkit-backdrop-filter: var(--card-blur);
 }
-/* 화면 제목 — 크기/굵기/여백으로만 위계를 준다 */
-.ui-h {
-    font-size: var(--tin-fs-lg);
-    font-weight: 700;
-    letter-spacing: .3px;
+.ui-stack     { display: flex; flex-direction: column; gap: var(--gap); }
+.ui-stack-lg  { display: flex; flex-direction: column; gap: var(--gap-lg); }
+.ui-sections  { display: flex; flex-direction: column; gap: var(--gap-sec); }
+.ui-row       { display: flex; align-items: center; gap: var(--gap); }
+
+/* 버튼 — 스타일과 무관하게 같은 리듬 */
+.ui-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: calc(var(--radius-card) - 4px);
+    background: var(--surface);
     color: var(--text);
+    font-size: var(--fs-sub);
+    font-weight: var(--fw-med);
+    transition: background .12s, border-color .12s, color .12s;
 }
-.ui-sub {
-    font-size: var(--tin-fs-sm);
-    color: color-mix(in srgb, var(--text) 70%, transparent);
+.ui-btn:hover { background: var(--surface-3); }
+.ui-btn:disabled { opacity: .5; }
+.ui-btn-accent {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--accent-contrast);
+}
+.ui-btn-accent:hover { filter: brightness(1.06); background: var(--accent); }
+
+/* ---------------- 즐겨찾기 화면 (스타일별 레이아웃 차이) ---------------- */
+/* 요약 카드 — S3(대시보드)에서만 보인다 */
+.fav-summary { display: none; }
+:root[data-ui-style="s3"] .fav-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: var(--gap);
+}
+/* 목록 vs 그리드 — S2/S4 는 카드 그리드, S1/S3 는 목록 */
+.fav-items { display: flex; flex-direction: column; gap: var(--gap); }
+:root[data-ui-style="s2"] .fav-items,
+:root[data-ui-style="s4"] .fav-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.fav-item {
+    display: flex; align-items: center; gap: var(--gap);
+    width: 100%;
+    padding: 14px 16px;
+    text-align: left;
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: calc(var(--radius-card) - 4px);
+    transition: background .12s, border-color .12s, transform .12s;
+}
+.fav-item:hover {
+    background: var(--surface-3);
+    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+}
+.fav-item:disabled { opacity: .5; }
+/* 그리드일 때는 세로로 쌓아 카드처럼 */
+:root[data-ui-style="s2"] .fav-item,
+:root[data-ui-style="s4"] .fav-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    padding: var(--pad-card);
+    min-height: 96px;
 }

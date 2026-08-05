@@ -19,6 +19,12 @@ export interface ThemeSettings {
 
 export const FONT_OPTIONS: { label: string; value: string }[] = [
   {
+    // 앱에 번들된 폰트. 시스템 기본(맑은 고딕 등)은 쓰지 않는다 — PC 마다
+    // 글자 모양과 자간이 달라져 여백 설계가 무너진다.
+    label: "Pretendard (기본)",
+    value: `"Pretendard Variable", Pretendard, "Inter Variable", system-ui, sans-serif`,
+  },
+  {
     label: "고정폭 (D2Coding·Consolas)",
     value: `"D2Coding", "Cascadia Mono", Consolas, ui-monospace, SFMono-Regular, Menlo, monospace`,
   },
@@ -46,7 +52,7 @@ export const ACCENT_PRESETS = [
 export const DEFAULT_THEME: ThemeSettings = {
   textColor: "#FFFFFF",
   accentColor: "#3ddc84",
-  fontFamily: FONT_OPTIONS[0].value,
+  fontFamily: FONT_OPTIONS[0].value, // Pretendard
   fontSize: 14,
 }
 
