@@ -8,6 +8,21 @@ import type {
 /** 켜기/끄기용 마커. 끄면 `#nop [OFF] #action {..} {..}` 형태로 주석 처리된다. */
 export const OFF_MARK = "[OFF]"
 
+/**
+ * 패턴에 쓰는 특수문자 설명.
+ *
+ * 자반 표 옆 치트시트(components/cheatsheet)와 사용법 화면(components/guide-view)
+ * 두 곳에서 쓴다. 컴포넌트 파일이 아니라 여기 두는 이유: 컴포넌트 파일이
+ * 상수를 함께 내보내면 리액트 fast-refresh 가 깨진다(react-refresh 룰).
+ */
+export const PATTERN_TIPS: [string, string][] = [
+  ["%1 ~ %9", "매칭된 단어를 담는 빈칸. 명령 쪽에서 %1로 다시 쓸 수 있다"],
+  ["%*", "아무 글자나 0개 이상 (앞뒤 문맥이 바뀌어도 매칭)"],
+  ["{이|가}", "둘 중 하나 매칭. 조사만 다른 패턴을 한 줄로 합칠 때"],
+  ["\\명령", "앞에 백슬래시를 붙이면 알리아스 치환 없이 그대로 서버로 전송"],
+  ["..", "같은 방 사람에게 보내는 채팅 신호 (명령의 일부, 지우면 안 됨)"],
+]
+
 export interface TypeMeta {
   /** 사이드바/제목에 쓸 한글 이름 */
   label: string

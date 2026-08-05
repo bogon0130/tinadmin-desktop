@@ -1,13 +1,5 @@
-import { TYPE_META } from "@/lib/tin-utils"
+import { PATTERN_TIPS, TYPE_META } from "@/lib/tin-utils"
 import type { TableType } from "@/lib/types"
-
-const PATTERN_TIPS: [string, string][] = [
-  ["%1 ~ %9", "매칭된 단어를 담는 빈칸. 명령 쪽에서 %1로 다시 쓸 수 있다"],
-  ["%*", "아무 글자나 0개 이상 (앞뒤 문맥이 바뀌어도 매칭)"],
-  ["{이|가}", "둘 중 하나 매칭. 조사만 다른 패턴을 한 줄로 합칠 때"],
-  ["\\명령", "앞에 백슬래시를 붙이면 알리아스 치환 없이 그대로 서버로 전송"],
-  ["..", "같은 방 사람에게 보내는 채팅 신호 (명령의 일부, 지우면 안 됨)"],
-]
 
 export function Cheatsheet({ type }: { type: TableType }) {
   const meta = TYPE_META[type]

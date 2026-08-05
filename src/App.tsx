@@ -1,45 +1,27 @@
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import {
-  AlarmClock,
   BarChart3,
-  ChevronDown,
-  ChevronRight,
-  Users,
   BookOpen,
   BookText,
-  Boxes,
-  EyeOff,
-  FileCode2,
   FolderCog,
+  GraduationCap,
   Plug,
-  Highlighter,
-  Keyboard,
-  Loader2,
   LogOut,
   OctagonX,
   Play,
-  Replace,
-  Save,
   Settings,
   Terminal,
-  Variable,
-  Wand2,
-  Zap,
 } from "lucide-react"
 import { Toaster, toast } from "sonner"
 
 import {
   clearToken,
-  listTinFiles,
   getApiUrl,
   getToken,
-  loadFile,
   resume,
-  saveFile,
   setApiUrl,
   stopAll,
 } from "@/lib/api"
-import { TYPE_META } from "@/lib/tin-utils"
 import {
   ACCENT_PRESETS,
   DEFAULT_THEME,
@@ -49,32 +31,21 @@ import {
   saveTheme,
   type ThemeSettings,
 } from "@/lib/theme"
-import type { TableType, TinEntry } from "@/lib/types"
 import { LoginScreen } from "@/components/login-screen"
-import { EntryTable } from "@/components/entry-table"
-import { FavoritesPanel } from "@/components/favorites-panel"
-import { GroupsView } from "@/components/groups-view"
-import { QuickFavoritesPanel } from "@/components/quick-favorites-panel"
-import { usePanelWidth, usePersistentState } from "@/lib/persist"
-import { Cheatsheet } from "@/components/cheatsheet"
-import { RawView } from "@/components/raw-view"
-import { PresetsView } from "@/components/presets-view"
+import { usePanelWidth } from "@/lib/persist"
 import { NotesView } from "@/components/notes-view"
 import { StatsView } from "@/components/stats-view"
-import { ReferencePanel } from "@/components/reference-panel"
 import { FilesView } from "@/components/files-view"
 import { ComboView } from "@/components/combo-view"
 import { GroupDocView } from "@/components/group-doc-view"
+import { GuideView } from "@/components/guide-view"
 
 type ViewId =
-  | TableType
-  | "presets"
+  | "guide"
   | "notes"
-  | "raw"
   | "stats"
   | "files"
   | "combo"
-  | "groups"
   | "doc-한비광그룹"
   | "doc-천마신군그룹"
 
@@ -84,67 +55,26 @@ const GROUP_DOCS: Record<string, string> = {
   "doc-천마신군그룹": "천마신군그룹",
 }
 
-type MenuItem = { id: ViewId; label: string; icon: typeof Zap }
+type MenuItem = { id: ViewId; label: string; icon: typeof BookOpen }
 
-/** 자주 쓰는 메뉴 — 항상 펼쳐져 있다 */
+/** 왼쪽 메뉴 — 전부 항상 펼쳐져 있다 */
 const MENU: MenuItem[] = [
-  // 그룹별 운영 참고서 — 우측 [참고서] 패널과 같은 BookOpen 아이콘을 쓴다
+  // 그룹별 운영 참고서
   { id: "doc-한비광그룹", label: "한비광그룹", icon: BookOpen },
   { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
   { id: "files", label: "파일 관리", icon: FolderCog },
   { id: "combo", label: "접속 빌더", icon: Plug },
-  { id: "groups", label: "캐릭터 그룹", icon: Users },
   { id: "stats", label: "통계", icon: BarChart3 },
-  { id: "presets", label: "캐릭터 프리셋", icon: Boxes },
   { id: "notes", label: "정보 저장소", icon: BookText },
-  { id: "raw", label: "Raw 편집", icon: FileCode2 },
+  { id: "guide", label: "사용법", icon: GraduationCap },
 ]
-
-/**
- * 자반 항목을 종류별로 직접 편집하는 GUI 메뉴들.
- *
- * 파일 관리 화면에서 대부분 처리할 수 있어 평소에는 접어둔다.
- * 지우지 않는다 — 종류별로 훑어보거나 표로 고칠 때 여전히 쓴다.
- */
-const ADVANCED: MenuItem[] = [
-  { id: "action", label: "자반", icon: Zap },
-  { id: "alias", label: "줄임말", icon: Wand2 },
-  { id: "variable", label: "변수", icon: Variable },
-  { id: "substitute", label: "치환", icon: Replace },
-  { id: "highlight", label: "하이라이트", icon: Highlighter },
-  { id: "gag", label: "가그", icon: EyeOff },
-  { id: "macro", label: "매크로", icon: Keyboard },
-  { id: "ticker", label: "타이머", icon: AlarmClock },
-  { id: "class", label: "클래스", icon: Boxes },
-]
-
-function isTableType(v: ViewId): v is TableType {
-  return v in TYPE_META
-}
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()))
-  const [view, setView] = useState<ViewId>("action")
-  // 즐겨찾기가 추가되면 이 값을 올려 사이드바를 다시 읽게 한다
-  const [favReload, setFavReload] = useState(0)
-  // 캐릭터 그룹에서 tin 링크를 누르면 파일 관리로 넘어가며 열 파일을 전달한다
-  const [openFile, setOpenFile] = useState<string | null>(null)
-  // 고급 섹션 펼침 — 기본 접힘. 메뉴를 옮겨도 유지되게 localStorage 에 둔다.
-  const [advOpen, setAdvOpen] = usePersistentState("tin.menu.advOpen", false)
+  const [view, setView] = useState<ViewId>("files")
   // 왼쪽 사이드바 폭 — 경계를 끌어 조절하고 재시작해도 유지된다.
-  // 기본값을 224px(w-56)에서 288px 로 넓혔다. 즐겨찾기 경로가 잘려서다.
   const [navW, setNavW] = usePanelWidth("tin.nav.width", 288, 200, 560)
-  // 표 화면 파일 선택기 목록 — 서버에서 받는다(하드코딩 제거).
-  // /api/load 가 다룰 수 있는 파일만 담는다 (table_editable=true)
-  const [tableFiles, setTableFiles] = useState<string[]>([])
-  const [file, setFile] = useState("")
-  const [entries, setEntries] = useState<TinEntry[]>([])
-  const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [dirty, setDirty] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  // 참고서 패널 — 기본은 접힘 (필요할 때 상단 버튼으로 펼침)
-  const [showRef, setShowRef] = useState(false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
   const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
 
@@ -152,68 +82,6 @@ export default function App() {
   useEffect(() => {
     applyTheme(loadTheme())
   }, [])
-
-  // 표 화면에서 고를 수 있는 파일 목록을 서버에서 받아온다
-  useEffect(() => {
-    if (!authed) return
-    listTinFiles()
-      .then((list) => {
-        const names = list.filter((f) => f.table_editable).map((f) => f.name)
-        setTableFiles(names)
-        setFile((cur) => (cur && names.includes(cur) ? cur : (names[0] ?? "")))
-      })
-      .catch(() => {
-        // 목록을 못 받아도 앱이 멈추지 않게 (파일 관리 화면에서 다시 시도 가능)
-      })
-  }, [authed])
-
-  const load = useCallback(async (target: string) => {
-    setLoading(true)
-    try {
-      const list = await loadFile(target)
-      setEntries(list)
-      setDirty(false)
-    } catch (e) {
-      const err = e as Error & { status?: number }
-      if (err.status === 401) {
-        clearToken()
-        setAuthed(false)
-        toast.error("로그인이 만료되었습니다. 다시 접속하세요.")
-      } else {
-        toast.error(err.message)
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    // file 은 목록을 받아온 뒤에 채워진다. 빈 값이면 아직 호출하지 않는다.
-    if (authed && file) void load(file)
-  }, [authed, file, load])
-
-  async function handleSave() {
-    setSaving(true)
-    try {
-      const res = await saveFile(file, entries)
-      setDirty(false)
-      toast.success(
-        res.tmux_ok ? "저장 완료 — tt++에 반영됨" : "저장 완료 (tmux 반영 실패)",
-        {
-          description: res.tmux_ok
-            ? `백업: ${res.backup?.split("/").pop() ?? "없음"}`
-            : res.tmux_msg,
-        },
-      )
-      await load(file)
-    } catch (e) {
-      toast.error("저장 실패", {
-        description: e instanceof Error ? e.message : String(e),
-      })
-    } finally {
-      setSaving(false)
-    }
-  }
 
   async function handleStopAll() {
     if (
@@ -259,13 +127,6 @@ export default function App() {
     )
   }
 
-  const usesFile =
-    view !== "presets" &&
-    view !== "notes" &&
-    view !== "stats" &&
-    view !== "files" &&
-    view !== "combo"
-
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
       {/* 사이드바 */}
@@ -304,47 +165,6 @@ export default function App() {
               </button>
             )
           })}
-
-          {/* 고급 — 종류별 GUI 편집기. 평소엔 접어둔다 */}
-          <div className="mt-2 border-t border-sidebar-border pt-2">
-            <button
-              onClick={() => setAdvOpen((v) => !v)}
-              className="mb-0.5 flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[11px] font-semibold tracking-wide text-sidebar-foreground transition hover:bg-sidebar-accent/60"
-            >
-              {advOpen ? (
-                <ChevronDown className="size-3.5 shrink-0" />
-              ) : (
-                <ChevronRight className="size-3.5 shrink-0" />
-              )}
-              <span>고급 · 종류별 편집</span>
-              <span className="ml-auto text-[10px] text-muted-foreground">
-                {ADVANCED.length}
-              </span>
-            </button>
-
-            {advOpen &&
-              ADVANCED.map((m) => {
-                const Icon = m.icon
-                const active = view === m.id
-                return (
-                  <button
-                    key={m.id}
-                    onClick={() => setView(m.id)}
-                    className={`mb-0.5 flex w-full items-center gap-2.5 rounded-md py-2 pl-6 pr-3 text-left text-[13px] transition ${
-                      active
-                        ? "bg-sidebar-accent font-semibold text-primary"
-                        : "text-sidebar-foreground hover:bg-sidebar-accent/60"
-                    }`}
-                  >
-                    <Icon className="size-4 shrink-0" />
-                    <span className="truncate">{m.label}</span>
-                  </button>
-                )
-              })}
-          </div>
-
-          {/* 즐겨찾기 — 클릭 한 번으로 저장된 방식대로 접속한다 */}
-          <FavoritesPanel reloadKey={favReload} />
         </div>
 
         <div className="border-t border-sidebar-border p-2">
@@ -397,67 +217,10 @@ export default function App() {
         {/* 상단 고정 바 */}
         <header className="flex shrink-0 items-center gap-3 border-b border-border bg-card px-5 py-3">
           <h2 className="text-sm font-semibold">
-            {[...MENU, ...ADVANCED].find((m) => m.id === view)?.label}
+            {MENU.find((m) => m.id === view)?.label}
           </h2>
 
-          {usesFile && (
-            <>
-              <select
-                value={file}
-                onChange={(e) => {
-                  if (
-                    dirty &&
-                    !confirm("저장하지 않은 변경이 있습니다. 그래도 바꿀까요?")
-                  )
-                    return
-                  setFile(e.target.value)
-                }}
-                className="font-mono-tin rounded-md border border-input bg-background px-2.5 py-1.5 text-xs outline-none focus:border-primary"
-              >
-                {tableFiles.map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-
-              {dirty && (
-                <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">
-                  저장 안 됨
-                </span>
-              )}
-              {loading && (
-                <Loader2 className="size-4 animate-spin text-muted-foreground" />
-              )}
-
-              <button
-                onClick={handleSave}
-                disabled={saving || loading}
-                className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:brightness-110 disabled:opacity-50"
-              >
-                {saving ? (
-                  <Loader2 className="size-3.5 animate-spin" />
-                ) : (
-                  <Save className="size-3.5" />
-                )}
-                저장
-              </button>
-            </>
-          )}
-
           <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={() => setShowRef((v) => !v)}
-              title="운영 참고서 (서버 docs/참고서.md)"
-              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition"
-              style={{
-                borderColor: showRef ? "var(--tin-accent)" : "var(--tin-edge)",
-                color: showRef ? "var(--tin-accent)" : "var(--tin-fg)",
-              }}
-            >
-              <BookOpen className="size-3.5" />
-              참고서
-            </button>
             <button
               onClick={handleStopAll}
               className="flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
@@ -477,52 +240,14 @@ export default function App() {
 
         {/* 콘텐츠 */}
         <div className="flex min-h-0 flex-1">
-          {isTableType(view) && (
-            <>
-              <EntryTable
-                type={view}
-                entries={entries}
-                onChange={(next) => {
-                  setEntries(next)
-                  setDirty(true)
-                }}
-              />
-              {/* 참고서를 펼치면 치트시트는 접는다 (좁은 화면에서 표가 눌리지 않게) */}
-              {!showRef && <Cheatsheet type={view} />}
-            </>
-          )}
-          {view === "raw" && (
-            <RawView
-              entries={entries}
-              onChange={(next) => {
-                setEntries(next)
-                setDirty(true)
-              }}
-            />
-          )}
-          {view === "presets" && (
-            <PresetsView currentFile={file} entries={entries} />
-          )}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
-          {view === "files" && <FilesView openFile={openFile} />}
-          {view === "combo" && <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />}
+          {view === "files" && <FilesView />}
+          {view === "combo" && <ComboView />}
+          {view === "guide" && <GuideView />}
           {GROUP_DOCS[view] && (
             <GroupDocView key={view} docKey={GROUP_DOCS[view]} />
           )}
-          {view === "groups" && (
-            <GroupsView
-              onOpenFile={(name) => {
-                setOpenFile(name)
-                setView("files")
-              }}
-            />
-          )}
-
-          {/* 우측 고정 참고 패널 — 기본은 접힘, 상단 [참고서] 버튼으로 토글 */}
-          {/* 원클릭 즐겨찾기 — 상시 표시 */}
-          <QuickFavoritesPanel />
-          {showRef && <ReferencePanel onClose={() => setShowRef(false)} />}
         </div>
       </div>
 
@@ -728,7 +453,6 @@ export default function App() {
                     toast.success("설정 저장됨", {
                       description: "다음 실행 때도 유지됩니다.",
                     })
-                    void load(file)
                   }}
                   className="rounded-md px-3 py-1.5 font-semibold"
                   style={{
