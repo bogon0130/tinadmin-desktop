@@ -140,8 +140,17 @@ export default function App() {
           </div>
           <div className="min-w-0">
             <div className="truncate text-sm font-semibold">tinadmin</div>
-            <div className="truncate text-[10px] text-muted-foreground">
-              tt++ 자반 관리자
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-[10px] text-muted-foreground">
+                tt++ 자반 관리자
+              </span>
+              {/* 버전은 package.json 에서 빌드 시점에 박힌다 (vite define) */}
+              <span
+                title={`tinadmin-desktop v${__APP_VERSION__}`}
+                className="shrink-0 rounded-full border border-border px-1.5 py-px text-[9px] leading-normal text-muted-foreground"
+              >
+                v{__APP_VERSION__}
+              </span>
             </div>
           </div>
         </div>
