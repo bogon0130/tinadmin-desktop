@@ -40,8 +40,13 @@ import { FilesView } from "@/components/files-view"
 import { ComboView } from "@/components/combo-view"
 import { GroupDocView } from "@/components/group-doc-view"
 import { GuideView } from "@/components/guide-view"
-import { FavoritesPanel } from "@/components/favorites-panel"
-import { QuickFavoritesPanel } from "@/components/quick-favorites-panel"
+import { FavoritesView } from "@/components/favorites-view"
+import {
+  UI_THEMES,
+  applyUiTheme,
+  loadUiTheme,
+  type UiTheme,
+} from "@/lib/ui-theme"
 
 type ViewId =
   | "favorites"
@@ -85,10 +90,14 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
   const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
+  // [임시 — 톤 확정 후 제거] A/B 시안 비교용 스위치
+  const [uiTheme, setUiTheme] = useState<UiTheme>(() => loadUiTheme())
 
   // 저장된 화면 설정을 시작할 때 적용 (다음 실행에도 유지)
   useEffect(() => {
     applyTheme(loadTheme())
+    // UI 테마가 글자색/강조색을 덮어써야 하므로 나중에 적용한다
+    applyUiTheme(loadUiTheme(), false)
   }, [])
 
   async function handleStopAll() {
@@ -185,6 +194,36 @@ export default function App() {
         </div>
 
         <div className="border-t border-sidebar-border p-2">
+          {/* [임시 — 톤 확정 후 이 블록 통째로 제거] 색상 시안 A/B 비교 */}
+          <div className="mb-1 flex items-center gap-1.5 px-3 py-1.5">
+            <span className="ui-sub shrink-0">색상 시안</span>
+            <div
+              className="ml-auto flex overflow-hidden rounded-md border"
+              style={{ borderColor: "var(--border)" }}
+            >
+              {UI_THEMES.map((t) => {
+                const on = uiTheme === t.id
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => {
+                      setUiTheme(t.id)
+                      applyUiTheme(t.id)
+                    }}
+                    title={t.hint}
+                    className="px-2.5 py-1 text-[11px] font-semibold transition"
+                    style={{
+                      background: on ? "var(--accent)" : "transparent",
+                      color: on ? "var(--accent-contrast)" : "var(--text)",
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
           <button
             onClick={() => {
               setUrlDraft(getApiUrl())
@@ -255,20 +294,12 @@ export default function App() {
           </div>
         </header>
 
-        {/* 콘텐츠 */}
-        <div className="flex min-h-0 flex-1">
-          {view === "favorites" && (
-            <>
-              {/* 왼쪽: 접속 즐겨찾기 트리 — 누르면 PowerShell 로 SSH 접속 */}
-              <div className="tin-scroll min-h-0 flex-1 overflow-y-auto p-5">
-                <div className="mx-auto max-w-3xl">
-                  <FavoritesPanel reloadKey={favReload} />
-                </div>
-              </div>
-              {/* 오른쪽: 원클릭 명령 — 지금 보고 있는 게임 창으로 바로 전송 */}
-              <QuickFavoritesPanel />
-            </>
-          )}
+        {/* 콘텐츠 — 항상 한 칸이다.
+            화면별로 옆에 패널을 덧붙이던 걸 없앴다(UI 개편 1단계). 각 뷰는
+            이 한 칸 안에서 완결되어야 하고, 필요한 보조 정보는 뷰 내부에서
+            카드로 쌓는다. */}
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {view === "favorites" && <FavoritesView reloadKey={favReload} />}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView />}
@@ -279,7 +310,7 @@ export default function App() {
           {GROUP_DOCS[view] && (
             <GroupDocView key={view} docKey={GROUP_DOCS[view]} />
           )}
-        </div>
+        </main>
       </div>
 
       {/* 설정 모달 */}

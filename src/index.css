@@ -503,3 +503,147 @@ body, body * {
     background: rgb(var(--tin-accent-rgb) / 0.09);
 }
 .markdown-body .md-table tbody tr:last-child td { border-bottom: 0; }
+
+/* ============================================================================
+   디자인 토큰 (UI 개편 1단계)
+
+   화면마다 색을 직접 적던 걸 여기 토큰으로 모은다. 컴포넌트는 토큰만 참조하고
+   실제 색값은 테마(A/B)에서만 정한다 — 색을 바꾸려고 컴포넌트를 뒤지지 않게.
+
+   토큰 이름은 역할로 짓는다(--surface, --accent). "네이비", "노랑" 같은 색
+   이름을 쓰면 테마 B 에서 이름과 실제 색이 어긋난다.
+
+   ★기존 --tin-* 변수와의 관계★
+     --tin-fg / --tin-accent 는 설정 패널(theme.ts applyTheme)이 인라인으로
+     주입해서 이 파일의 규칙보다 우선한다. 그래서 A/B 전환 시 lib/ui-theme.ts
+     가 두 값을 테마에 맞게 다시 주입한다. 나머지 --tin-* 는 여기서 토큰에
+     연결해 두면 기존 화면도 자동으로 새 팔레트를 따라온다.
+   ============================================================================ */
+
+/* ---- 테마 A — 네이비 + 노랑 ---- */
+:root[data-ui-theme="a"] {
+    --bg: #0f1830;
+    /* "아주 은은한 세로 그라데이션만" — 방사형 glow 는 쓰지 않는다 */
+    --bg-image: linear-gradient(180deg, #131e3a 0%, #0f1830 38%, #0d1529 100%);
+
+    --surface: #16213f;      /* 카드/패널 — 배경보다 한 단계 밝게 */
+    --surface-2: #1c2a4d;    /* 입력칸·표 헤더처럼 한 겹 더 올라온 면 */
+    --surface-3: #223160;    /* hover / 선택 */
+
+    --text: #f5f7fa;
+    --accent: #f5c518;
+    --accent-contrast: #1a1400;   /* 강조색 위에 얹는 글자 */
+    --accent-rgb: 245 197 24;
+
+    --border: #2a3a63;
+    --border-soft: #1f2c4d;
+
+    --danger: #e5484d;
+    --danger-contrast: #ffffff;
+
+    --shadow-card: none;     /* 어두운 테마에선 그림자 대신 테두리로 면을 나눈다 */
+}
+
+/* ---- 테마 B — 파스텔 화사 ---- */
+:root[data-ui-theme="b"] {
+    --bg: #f4f2fb;
+    --bg-image: linear-gradient(180deg, #faf8ff 0%, #f4f2fb 45%, #efedf8 100%);
+
+    --surface: #ffffff;
+    --surface-2: #f8f7fd;
+    --surface-3: #eeebfa;
+
+    --text: #26324d;         /* 회색이 아니라 진한 남색 */
+    --accent: #5b8def;
+    --accent-contrast: #ffffff;
+    --accent-rgb: 91 141 239;
+
+    --border: #e0ddef;
+    --border-soft: #ecebf6;
+
+    --danger: #e05a5a;
+    --danger-contrast: #ffffff;
+
+    --shadow-card: 0 1px 2px rgb(38 50 77 / 0.06), 0 2px 8px rgb(38 50 77 / 0.05);
+}
+
+/* ---- 토큰 -> 기존 변수 매핑 ----
+   이 한 블록 덕분에 아직 손대지 않은 화면도 새 팔레트를 따라온다. */
+:root[data-ui-theme] {
+    --tin-bg: var(--bg);
+    --tin-panel: var(--surface);
+    --tin-panel2: var(--surface-2);
+    --tin-edge: var(--border);
+    --tin-edge-soft: var(--border-soft);
+
+    --background: var(--bg);
+    --foreground: var(--text);
+    --card: var(--surface);
+    --card-foreground: var(--text);
+    --popover: var(--surface);
+    --popover-foreground: var(--text);
+    --primary: var(--accent);
+    --primary-foreground: var(--accent-contrast);
+    --secondary: var(--surface-2);
+    --secondary-foreground: var(--text);
+    --muted: var(--surface-2);
+    --muted-foreground: var(--text);
+    --accent-foreground: var(--text);
+    --destructive: var(--danger);
+    --destructive-foreground: var(--danger-contrast);
+    /* --border 는 위 테마 블록에서 이미 정의한 토큰 그대로 쓴다
+       (shadcn 의 --border 와 이름이 같아서 다시 대입하면 순환 참조가 된다) */
+    --input: var(--border);
+    --ring: var(--accent);
+
+    --sidebar: var(--surface);
+    --sidebar-foreground: var(--text);
+    --sidebar-primary: var(--accent);
+    --sidebar-primary-foreground: var(--accent-contrast);
+    --sidebar-accent: var(--surface-3);
+    --sidebar-accent-foreground: var(--text);
+    --sidebar-border: var(--border);
+    --sidebar-ring: var(--accent);
+}
+
+/* html 자신이 :root 라서 ":root html" 은 매칭되지 않는다 — 따로 적는다 */
+:root[data-ui-theme],
+:root[data-ui-theme] body {
+    background: var(--bg-image), var(--bg);
+    color: var(--text);
+}
+
+/* ---- 덜 중요한 글자: 회색으로 바꾸지 않고 같은 색을 옅게 ----
+   회색을 쓰면 테마 B(밝은 배경)에서 읽기 어려워진다. opacity 대신
+   color-mix 를 쓰는 이유: opacity 는 자식 요소까지 흐려진다. */
+:root[data-ui-theme] .text-muted-foreground,
+:root[data-ui-theme] .t-dim {
+    color: color-mix(in srgb, var(--text) 70%, transparent);
+}
+:root[data-ui-theme] .t-dim-strong {
+    color: color-mix(in srgb, var(--text) 85%, transparent);
+}
+
+/* ---- 공통 표면 유틸 ---- */
+.ui-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: var(--shadow-card);
+}
+.ui-card-2 {
+    background: var(--surface-2);
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+}
+/* 화면 제목 — 크기/굵기/여백으로만 위계를 준다 */
+.ui-h {
+    font-size: var(--tin-fs-lg);
+    font-weight: 700;
+    letter-spacing: .3px;
+    color: var(--text);
+}
+.ui-sub {
+    font-size: var(--tin-fs-sm);
+    color: color-mix(in srgb, var(--text) 70%, transparent);
+}

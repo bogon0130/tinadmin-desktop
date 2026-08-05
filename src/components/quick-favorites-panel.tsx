@@ -106,36 +106,33 @@ export function QuickFavoritesPanel() {
     "tin-mono w-full rounded-md border bg-transparent px-2 py-1 outline-none focus:border-[var(--tin-accent)]"
 
   return (
-    <aside
-      className="tin-scroll w-64 shrink-0 overflow-y-auto border-l"
-      style={{ borderColor: "var(--tin-edge)", background: "var(--tin-panel)" }}
-    >
-      {/* 대상 창 — 원클릭이라 항상 보이게 */}
-      <div
-        className="sticky top-0 border-b px-3 py-2"
-        style={{ borderColor: "var(--tin-edge)", background: "var(--tin-panel)" }}
-      >
-        <div className="flex items-center gap-1.5">
-          <Send className="size-3.5 tin-accent" />
-          <span className="tin-accent font-semibold" style={{ fontSize: "var(--tin-fs-sm)" }}>
-            즐겨찾기
-          </span>
+    /* 오른쪽 별도 패널이던 것을 콘텐츠 안의 카드로 흡수했다 (UI 개편 1단계).
+       전송 로직은 그대로다. */
+    <div className="ui-card p-4">
+      <div className="mb-3">
+        <div className="flex items-center gap-2">
+          <Send className="size-4" style={{ color: "var(--accent)" }} />
+          <span className="ui-h">원클릭 명령</span>
           <button
             onClick={() => void refreshTarget()}
-            className="ml-auto rounded p-0.5 hover:bg-[var(--tin-panel2)]"
+            className="ml-auto flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-sidebar-accent"
+            style={{ borderColor: "var(--border)" }}
             title="대상 창 다시 확인"
           >
-            <RefreshCw className="size-3" />
+            <RefreshCw className="size-3.5" />
+            새로고침
           </button>
           <button
             onClick={() => setEdit({ id: newId(), label: "", command: "" })}
-            className="rounded p-0.5 hover:bg-[var(--tin-panel2)]"
-            title="새 즐겨찾기"
+            className="flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs transition hover:bg-sidebar-accent"
+            style={{ borderColor: "var(--border)" }}
+            title="새 명령"
           >
             <Plus className="size-3.5" />
+            추가
           </button>
         </div>
-        <div className="mt-1 flex items-center gap-1">
+        <div className="mt-2 flex items-center gap-1">
           <Monitor className="size-3 shrink-0" style={{ opacity: 0.6 }} />
           {target ? (
             <span className="tin-mono truncate" style={{ fontSize: "var(--tin-fs-sm)" }}>
@@ -245,6 +242,6 @@ export function QuickFavoritesPanel() {
           </button>
         </div>
       ))}
-    </aside>
+    </div>
   )
 }
