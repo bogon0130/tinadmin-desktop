@@ -7,6 +7,7 @@ import {
   EMPTY_STORE,
   itemsByFolder,
   loadFavorites,
+  saveFavorites,
   type FavStore,
   type Favorite,
 } from "@/lib/favorites"
@@ -44,6 +45,26 @@ function readLast(): Record<string, number> {
   } catch {
     return {}
   }
+}
+
+/**
+ * 저장된 방식으로 실제 접속한다 — 이 앱에서 접속 순서를 정하는 유일한 함수.
+ *
+ *   1) comboCreate  조합을 다시 만들어 검증까지 통과시킨다 (실패 시 여기서 멈춤)
+ *   2) comboConnect 서버에서 접속 명령 재료를 받는다 (IP/계정은 서버 config/.env)
+ *   3) open_terminal 이 PC 가 새 PowerShell 창을 띄운다
+ *
+ * 훅을 쓸 수 없는 곳(기존 관리 패널)에서도 부를 수 있게 훅 밖에 둔다.
+ */
+export async function runConnect(f: Favorite) {
+  const c = await comboCreate(f.combo, f.files, f.session, f.host, f.port, f.sessionMode)
+  const info = await comboConnect(c.combo, c.session, f.mode)
+  await invoke<string>("open_terminal", {
+    target: info.ssh_target,
+    remote: info.remote,
+    title: `${f.name} ${modeLabel(f)} — tinadmin`,
+  })
+  return info
 }
 
 export function useFavorites(reloadKey: number) {
@@ -90,13 +111,7 @@ export function useFavorites(reloadKey: number) {
   const connect = useCallback(async (f: Favorite) => {
     setBusy(f.id)
     try {
-      const c = await comboCreate(f.combo, f.files, f.session, f.host, f.port, f.sessionMode)
-      const info = await comboConnect(c.combo, c.session, f.mode)
-      await invoke<string>("open_terminal", {
-        target: info.ssh_target,
-        remote: info.remote,
-        title: `${f.name} ${f.mode === "group" ? "그룹" : "단독"} — tinadmin`,
-      })
+      const info = await runConnect(f)
       setLastConnect((prev) => {
         const next = { ...prev, [f.id]: Date.now() }
         try {
@@ -118,7 +133,38 @@ export function useFavorites(reloadKey: number) {
     }
   }, [])
 
-  return { store, groups, loading, busy, connect, lastConnect, reload: load }
+  /**
+   * 캐릭터 메모 저장 — 해당 항목의 memo 만 바꾸고 나머지 필드는 그대로 둔다.
+   *
+   * ★서버는 스토어 전체를 통째로 받는다★
+   *   그래서 "메모만 보내는" 경량 API 가 따로 없다. 대신 현재 스토어를 복사해
+   *   memo 한 칸만 갈아끼워 보낸다 — 다른 항목/필드는 손대지 않는다.
+   *   저장에 실패하면 화면을 원래 값으로 되돌린다(낙관적 갱신 + 롤백).
+   */
+  const saveMemo = useCallback(
+    async (id: string, memo: string) => {
+      const prev = store
+      const next: FavStore = {
+        ...store,
+        items: store.items.map((x) => (x.id === id ? { ...x, memo } : x)),
+      }
+      setStore(next)
+      try {
+        await saveFavorites(next)
+        toast.success("메모 저장됨")
+        return true
+      } catch (e) {
+        setStore(prev) // 롤백
+        toast.error("메모 저장 실패", {
+          description: e instanceof Error ? e.message : String(e),
+        })
+        return false
+      }
+    },
+    [store],
+  )
+
+  return { store, groups, loading, busy, connect, saveMemo, lastConnect, reload: load }
 }
 
 /** 시안들이 공통으로 쓰는 표시용 헬퍼 */

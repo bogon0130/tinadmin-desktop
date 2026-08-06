@@ -541,82 +541,36 @@ body, body * {
     --shadow-card: none;
 }
 
-/* ---------------- S1 — Directory풍: 다크 사이드바 + 라이트 본문 ---------------- */
-:root[data-ui-style="s1"] {
-    --bg: #f4f5f8;  --bg-image: none;
-    --surface: #ffffff;  --surface-2: #f7f8fb;  --surface-3: #eef0f6;
-    --text: #1f2733;
-    --accent: #6b5bd2;  --accent-contrast: #ffffff;
-    --border: #e3e6ed;  --border-soft: #eef0f5;
-    --danger: #d64545;  --danger-contrast: #ffffff;
-    --radius-card: 10px;
+/* ---------------- 확정 스킨 — 차분한 다크 (노랑 배제, 강조 1색) ---------------- */
+:root {
+    --bg: #12151b;
+    --bg-image: linear-gradient(180deg, #171b23 0%, #12151b 45%, #0f1218 100%);
+
+    --surface: #1a1f28;      /* 카드 — 배경보다 한 단계 밝게 */
+    --surface-2: #212733;    /* 입력칸 등 한 겹 위 */
+    --surface-3: #2a3140;    /* hover / 선택 */
+
+    --text: #e8ecf2;
+    --accent: #5aa9e6;       /* 절제된 블루 1색 */
+    --accent-contrast: #08121b;
+
+    --border: #2b3240;
+    --border-soft: #222834;
+
+    --danger: #e06c6c;
+    --danger-contrast: #ffffff;
+
+    --radius-card: 12px;
+    --card-blur: none;
     --shadow-card: none;
-    /* 사이드바만 진한 남색 */
-    --nav-bg: #1e2749;  --nav-text: #e9ebf4;  --nav-border: #2a3459;
-    --nav-hover: #27325c;
-    --nav-active-bg: var(--accent);  --nav-active-text: #ffffff;
-}
 
-/* ---------------- S2 — 부동산풍: 전체 라이트, 큰 라운드, 그림자로 분리 ---------------- */
-:root[data-ui-style="s2"] {
-    --bg: #f2f4f7;  --bg-image: none;
-    --surface: #ffffff;  --surface-2: #f7f9fc;  --surface-3: #eef2f8;
-    --text: #1b2430;
-    --accent: #3b7ddd;  --accent-contrast: #ffffff;
-    /* 테두리를 거의 지우고 그림자와 여백으로 면을 나눈다 */
-    --border: #eef1f5;  --border-soft: #f4f6f9;
-    --danger: #d9534f;  --danger-contrast: #ffffff;
-    --radius-card: 18px;
-    --shadow-card: 0 1px 2px rgb(27 36 48 / 0.05), 0 10px 28px rgb(27 36 48 / 0.06);
-    --nav-bg: #ffffff;  --nav-text: #1b2430;  --nav-border: #eef1f5;
-    --nav-hover: #f2f4f7;
-    --nav-active-bg: color-mix(in srgb, var(--accent) 12%, transparent);
+    --nav-bg: #161a22;  --nav-text: var(--text);  --nav-border: #242b38;
+    --nav-hover: #212733;
+    --nav-active-bg: color-mix(in srgb, var(--accent) 16%, transparent);
     --nav-active-text: var(--accent);
 }
-
-/* ---------------- S3 — Commerce풍: 대시보드 정석, 상단 요약 카드 ---------------- */
-:root[data-ui-style="s3"] {
-    --bg: #f6f7f9;  --bg-image: none;
-    --surface: #ffffff;  --surface-2: #f8fafb;  --surface-3: #edf3f2;
-    --text: #17212b;
-    --accent: #0f8a80;  --accent-contrast: #ffffff;   /* 절제된 틸 */
-    --border: #e6e9ee;  --border-soft: #f0f2f5;
-    --danger: #cf4b4b;  --danger-contrast: #ffffff;
-    --radius-card: 10px;
-    --shadow-card: 0 1px 2px rgb(23 33 43 / 0.05);
-    --nav-bg: #ffffff;  --nav-text: #17212b;  --nav-border: #e6e9ee;
-    --nav-hover: #f2f5f4;
-    --nav-active-bg: color-mix(in srgb, var(--accent) 12%, transparent);
-    --nav-active-text: var(--accent);
-}
-
-/* ---------------- S4 — Lifestats풍: 다크 + 글래스 카드 ---------------- */
-:root[data-ui-style="s4"] {
-    --bg: #0e0f13;
-    --bg-image:
-        radial-gradient(900px 480px at 12% -8%, rgb(167 139 250 / 0.16), transparent 60%),
-        radial-gradient(700px 420px at 95% 8%, rgb(255 255 255 / 0.05), transparent 62%);
-    /* 반투명 + 블러 = 글래스모피즘 */
-    --surface: rgb(255 255 255 / 0.055);
-    --surface-2: rgb(255 255 255 / 0.035);
-    --surface-3: rgb(255 255 255 / 0.10);
-    --text: #eceef3;
-    --accent: #a78bfa;  --accent-contrast: #17121f;
-    --border: rgb(255 255 255 / 0.10);
-    --border-soft: rgb(255 255 255 / 0.06);
-    --danger: #f87171;  --danger-contrast: #1b0e0e;
-    --radius-card: 20px;
-    --card-blur: blur(14px);
-    --shadow-card: 0 8px 32px rgb(0 0 0 / 0.36);
-    --nav-bg: rgb(255 255 255 / 0.04);  --nav-text: #eceef3;
-    --nav-border: rgb(255 255 255 / 0.08);
-    --nav-hover: rgb(255 255 255 / 0.07);
-    --nav-active-bg: color-mix(in srgb, var(--accent) 22%, transparent);
-    --nav-active-text: #ffffff;
-}
-
 /* ---- 토큰 -> 기존 --tin-* / shadcn 매핑 (손대지 않은 화면도 따라오게) ---- */
-:root[data-ui-style] {
+:root {
     --tin-bg: var(--bg);
     --tin-panel: var(--surface);
     --tin-panel2: var(--surface-2);
@@ -654,8 +608,8 @@ body, body * {
     --radius: 10px;
 }
 
-:root[data-ui-style],
-:root[data-ui-style] body {
+:root,
+:root body {
     background: var(--bg-image, none), var(--bg);
     color: var(--text);
     font-family: var(--font);
@@ -666,8 +620,8 @@ body, body * {
 
 /* 덜 중요한 글자: 회색이 아니라 본문색을 옅게.
    opacity 는 자식까지 흐려지므로 color-mix 를 쓴다. */
-:root[data-ui-style] .text-muted-foreground,
-:root[data-ui-style] .t-dim {
+:root .text-muted-foreground,
+:root .t-dim {
     color: color-mix(in srgb, var(--text) 70%, transparent);
 }
 
@@ -724,43 +678,3 @@ body, body * {
     color: var(--accent-contrast);
 }
 .ui-btn-accent:hover { filter: brightness(1.06); background: var(--accent); }
-
-/* ---------------- 즐겨찾기 화면 (스타일별 레이아웃 차이) ---------------- */
-/* 요약 카드 — S3(대시보드)에서만 보인다 */
-.fav-summary { display: none; }
-:root[data-ui-style="s3"] .fav-summary {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-    gap: var(--gap);
-}
-/* 목록 vs 그리드 — S2/S4 는 카드 그리드, S1/S3 는 목록 */
-.fav-items { display: flex; flex-direction: column; gap: var(--gap); }
-:root[data-ui-style="s2"] .fav-items,
-:root[data-ui-style="s4"] .fav-items {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-}
-.fav-item {
-    display: flex; align-items: center; gap: var(--gap);
-    width: 100%;
-    padding: 14px 16px;
-    text-align: left;
-    background: var(--surface-2);
-    border: 1px solid var(--border-soft);
-    border-radius: calc(var(--radius-card) - 4px);
-    transition: background .12s, border-color .12s, transform .12s;
-}
-.fav-item:hover {
-    background: var(--surface-3);
-    border-color: color-mix(in srgb, var(--accent) 45%, transparent);
-}
-.fav-item:disabled { opacity: .5; }
-/* 그리드일 때는 세로로 쌓아 카드처럼 */
-:root[data-ui-style="s2"] .fav-item,
-:root[data-ui-style="s4"] .fav-item {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-    padding: var(--pad-card);
-    min-height: 96px;
-}

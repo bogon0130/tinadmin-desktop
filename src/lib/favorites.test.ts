@@ -38,6 +38,7 @@ function fav(over: Partial<Favorite> = {}): Favorite {
     mode: "solo",
     folder: "",
     createdAt: "2026-07-31",
+    memo: "",
     ...over,
   }
 }
@@ -95,6 +96,43 @@ describe("깨진 파일 방어", () => {
   test("왕복 보존", () => {
     const s = upsertItem(addFolder(EMPTY_STORE, "", "업무") as FavStore, fav({ folder: "업무" }))
     expect(parseStore(JSON.stringify(s)).store).toEqual(s)
+  })
+
+  /* ---- 캐릭터 메모 (서버 favorites.json 공유) ---- */
+  test("memo 가 없는 옛 항목은 빈 문자열로 읽는다 (하위호환)", () => {
+    const old = { ...fav() } as Partial<Favorite>
+    delete old.memo
+    const raw = JSON.stringify({ version: 1, folders: [], items: [old] })
+    expect(parseStore(raw).store.items[0].memo).toBe("")
+  })
+
+  test("memo 를 왕복해도 살아남는다", () => {
+    const s = upsertItem(EMPTY_STORE, fav({ memo: "트로이 전용 · 수리 없음" }))
+    expect(parseStore(JSON.stringify(s)).store.items[0].memo).toBe("트로이 전용 · 수리 없음")
+  })
+
+  test("memo 가 문자열이 아니면 빈 문자열로 떨어뜨린다", () => {
+    const raw = JSON.stringify({
+      version: 1,
+      folders: [],
+      items: [{ ...fav(), memo: { 이상한: "값" } }],
+    })
+    expect(parseStore(raw).store.items[0].memo).toBe("")
+  })
+
+  test("memo 를 고쳐도 다른 필드는 그대로다", () => {
+    const before = fav({ memo: "" })
+    const s = upsertItem(EMPTY_STORE, before)
+    const edited = {
+      ...s,
+      items: s.items.map((x) => ({ ...x, memo: "새 메모" })),
+    }
+    const after = parseStore(JSON.stringify(edited)).store.items[0]
+    expect(after.memo).toBe("새 메모")
+    expect(after.files).toEqual(before.files)
+    expect(after.session).toBe(before.session)
+    expect(after.host).toBe(before.host)
+    expect(after.combo).toBe(before.combo)
   })
 })
 

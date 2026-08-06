@@ -32,6 +32,13 @@ export interface Favorite {
   /** 소속 폴더. "" 면 최상위. "a/b" 처럼 하위 분류 가능 */
   folder: string
   createdAt: string
+  /**
+   * 캐릭터별 간단 메모 — 화면 표시용이고 접속에는 쓰이지 않는다.
+   *
+   * 서버 favorites.json 에 함께 저장되어 PC 간 공유된다. 기존 항목에는 없는
+   * 필드라 선택값이고, 없으면 "" 로 읽는다(하위호환).
+   */
+  memo?: string
 }
 
 /**
@@ -171,6 +178,8 @@ function toFavorite(v: unknown): Favorite | null {
     mode,
     folder: normFolder(str("folder")),
     createdAt: str("createdAt"),
+    // 기존 20개 항목에는 없다 — 없으면 빈 문자열로 읽는다
+    memo: str("memo"),
   }
 }
 

@@ -41,12 +41,7 @@ import { ComboView } from "@/components/combo-view"
 import { GroupDocView } from "@/components/group-doc-view"
 import { GuideView } from "@/components/guide-view"
 import { FavoritesView } from "@/components/favorites-view"
-import {
-  UI_STYLES,
-  applyUiStyle,
-  loadUiStyle,
-  type UiStyle,
-} from "@/lib/ui-style"
+import { applyUiBase } from "@/lib/ui-base"
 
 type ViewId =
   | "favorites"
@@ -90,14 +85,11 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
   const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
-  // [임시 — 스타일 확정 후 제거] S1~S4 시안 비교용 스위치
-  const [uiStyle, setUiStyle] = useState<UiStyle>(() => loadUiStyle())
-
   // 저장된 화면 설정을 시작할 때 적용 (다음 실행에도 유지)
   useEffect(() => {
     applyTheme(loadTheme())
-    // 스타일이 글자색/강조색/폰트를 덮어써야 하므로 나중에 적용한다
-    applyUiStyle(loadUiStyle(), false)
+    // 확정된 색/폰트로 덮어쓴다 (옛 설정이 localStorage 에 남아 있어도)
+    applyUiBase()
   }, [])
 
   async function handleStopAll() {
@@ -194,38 +186,6 @@ export default function App() {
         </div>
 
         <div className="border-t border-sidebar-border p-2">
-          {/* [임시 — 스타일 확정 후 이 블록 통째로 제거] 디자인 시안 S1~S4 비교 */}
-          <div className="px-3 py-1.5">
-            <div className="ty-sub" style={{ marginBottom: 6 }}>
-              디자인 시안
-            </div>
-            <div
-              className="flex overflow-hidden rounded-md border"
-              style={{ borderColor: "var(--border)" }}
-            >
-              {UI_STYLES.map((s) => {
-                const on = uiStyle === s.id
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => {
-                      setUiStyle(s.id)
-                      applyUiStyle(s.id)
-                    }}
-                    title={s.hint}
-                    className="flex-1 py-1 text-[11px] font-semibold transition"
-                    style={{
-                      background: on ? "var(--accent)" : "transparent",
-                      color: on ? "var(--accent-contrast)" : "var(--nav-text)",
-                    }}
-                  >
-                    {s.label}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
           <button
             onClick={() => {
               setUrlDraft(getApiUrl())
@@ -301,9 +261,7 @@ export default function App() {
             이 한 칸 안에서 완결되어야 하고, 필요한 보조 정보는 뷰 내부에서
             카드로 쌓는다. */}
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {view === "favorites" && (
-            <FavoritesView reloadKey={favReload} uiStyle={uiStyle} />
-          )}
+          {view === "favorites" && <FavoritesView reloadKey={favReload} />}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView />}
