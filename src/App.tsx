@@ -301,7 +301,9 @@ export default function App() {
             이 한 칸 안에서 완결되어야 하고, 필요한 보조 정보는 뷰 내부에서
             카드로 쌓는다. */}
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          {view === "favorites" && <FavoritesView reloadKey={favReload} />}
+          {view === "favorites" && (
+            <FavoritesView reloadKey={favReload} uiStyle={uiStyle} />
+          )}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
           {view === "files" && <FilesView />}
