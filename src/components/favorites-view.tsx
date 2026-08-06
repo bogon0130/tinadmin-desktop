@@ -3,7 +3,7 @@ import { Settings2, Star } from "lucide-react"
 
 import { FavoritesPanel } from "@/components/favorites-panel"
 import { QuickFavoritesPanel } from "@/components/quick-favorites-panel"
-import { FavMasterDetail } from "@/components/favorites/fav-master-detail"
+import { FavCommandCenter } from "@/components/favorites/fav-command-center"
 
 /**
  * 즐겨찾기 화면 셸 — 제목줄과 [관리 도구] 토글만 그린다.
@@ -22,13 +22,13 @@ export function FavoritesView({ reloadKey }: { reloadKey: number }) {
 
   return (
     <div
-      className="flex min-h-0 flex-1 flex-col"
+      className="tin-scroll min-h-0 flex-1 overflow-y-auto"
       style={{ padding: "var(--gap-sec)", gap: "var(--gap-sec)" }}
     >
       <div className="ui-row" style={{ flexShrink: 0 }}>
         <Star className="size-5" style={{ color: "var(--accent)" }} />
         <span className="ty-h">즐겨찾기</span>
-        <span className="ty-sub">왼쪽에서 캐릭터를 고르면 오른쪽에 상세가 나옵니다</span>
+        <span className="ty-sub">CONNECT 를 누르면 저장된 방식대로 접속합니다</span>
         <button
           onClick={() => setTools((v) => !v)}
           className="ui-btn"
@@ -40,7 +40,7 @@ export function FavoritesView({ reloadKey }: { reloadKey: number }) {
         </button>
       </div>
 
-      <FavMasterDetail reloadKey={reloadKey} />
+      <FavCommandCenter reloadKey={reloadKey} />
 
       {tools && (
         <div className="tin-scroll ui-sections" style={{ flexShrink: 0, maxHeight: "45vh", overflowY: "auto" }}>

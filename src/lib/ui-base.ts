@@ -14,8 +14,10 @@ import { applyTheme, loadTheme } from "./theme"
  */
 
 /** index.css 의 --text / --accent 와 같은 값이어야 한다 */
-export const UI_TEXT = "#e8ecf2"
-export const UI_ACCENT = "#5aa9e6"
+/* GON style.css :root 의 --text 그대로 */
+export const UI_TEXT = "#DDF6FB"
+/* GON style.css :root 의 --cyan 그대로 */
+export const UI_ACCENT = "#3FE6FF"
 
 export const UI_FONT =
   `"Pretendard Variable", Pretendard, "Inter Variable", system-ui, sans-serif`

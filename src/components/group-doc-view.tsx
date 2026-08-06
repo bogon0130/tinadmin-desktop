@@ -68,50 +68,32 @@ export function GroupDocView({ docKey }: { docKey: string }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col p-5">
-      {/* 그룹 요약 — 세션명과 창 수는 재접속할 때 매번 확인하는 값이라 늘 보이게 둔다 */}
-      <div
-        className="mb-4 shrink-0 rounded-lg border p-4"
-        style={{
-          borderColor: "var(--tin-edge)",
-          background:
-            "linear-gradient(90deg, rgb(var(--tin-accent-rgb) / 0.10), transparent 70%)",
-        }}
-      >
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <h2
-            className="tin-accent font-bold tracking-wide"
-            style={{ fontSize: "var(--tin-fs-xl)" }}
-          >
-            {summary.title || docKey}
-          </h2>
+      {/* 그룹 요약 — 세션명과 창 수는 재접속할 때 매번 확인하는 값이라 늘 보이게 둔다.
+          커맨드센터 패널(cc-panel)과 같은 면·뱃지를 쓴다. */}
+      <div className="cc-panel mb-4 shrink-0">
+        <div className="cc-head" style={{ marginBottom: 0 }}>
+          <span className="cc-dot on" />
+          <span className="cc-name">{summary.title || docKey}</span>
+          <span className="cc-badge ok">GROUP</span>
+        </div>
 
+        <div className="cc-tags" style={{ marginTop: 10, marginBottom: 0 }}>
           {summary.session && (
-            <span
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1"
-              style={{
-                borderColor: "var(--tin-edge)",
-                background: "var(--tin-panel2)",
-                fontSize: "var(--tin-fs-sm)",
-              }}
-            >
-              <Terminal className="tin-accent size-3.5" />
-              <span style={{ opacity: 0.7 }}>세션</span>
-              <b className="tin-mono">{summary.session}</b>
+            <span className="cc-tag" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <Terminal className="size-3" />
+              SESSION
+              <b style={{ color: "var(--cyan)", fontFamily: "var(--font-mono)" }}>
+                {summary.session}
+              </b>
             </span>
           )}
-
           {summary.windows !== null && (
-            <span
-              className="flex items-center gap-1.5 rounded-md border px-2.5 py-1"
-              style={{
-                borderColor: "var(--tin-edge)",
-                background: "var(--tin-panel2)",
-                fontSize: "var(--tin-fs-sm)",
-              }}
-            >
-              <MonitorPlay className="tin-accent size-3.5" />
-              <span style={{ opacity: 0.7 }}>창</span>
-              <b className="tin-mono">{summary.windows}개</b>
+            <span className="cc-tag" style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <MonitorPlay className="size-3" />
+              WINDOWS
+              <b style={{ color: "var(--cyan)", fontFamily: "var(--font-mono)" }}>
+                {summary.windows}
+              </b>
             </span>
           )}
         </div>

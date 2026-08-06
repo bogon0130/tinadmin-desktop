@@ -6,6 +6,12 @@
    CDN 이 아니라 로컬 번들이다: 이 앱은 오프라인에서도 떠야 하고 CSP 도 걸린다.
    dynamic-subset 이라 실제로 쓰인 글자 범위만 내려받는다. */
 @import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+/* GON 커맨드센터와 같은 영문 폰트 — 제목은 Chakra Petch, 수치/주소는 Share Tech Mono.
+   GON 은 Google Fonts CDN 을 쓰지만 이 앱은 오프라인 + CSP 라서 로컬 번들로 넣는다. */
+@import "@fontsource/chakra-petch/400.css";
+@import "@fontsource/chakra-petch/600.css";
+@import "@fontsource/chakra-petch/700.css";
+@import "@fontsource/share-tech-mono/400.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -519,7 +525,10 @@ body, body * {
      사라진다. 아래 4단계 밖의 글자 크기는 쓰지 않는다.
    ============================================================================ */
 :root {
+    /* 폰트 — GON style.css :root 와 같은 3종 구성 */
     --font: "Pretendard Variable", Pretendard, "Inter Variable", system-ui, sans-serif;
+    --font-display: "Chakra Petch", var(--font);   /* 카드 제목·화면 제목 */
+    --font-mono: "Share Tech Mono", ui-monospace, monospace;  /* 수치·경로·주소 */
 
     /* 글자 4단계 — 이 밖의 크기 금지 */
     --fs-h: 24px;      --fw-h: 700;     /* 화면 제목 */
@@ -541,34 +550,68 @@ body, body * {
     --shadow-card: none;
 }
 
-/* ---------------- 확정 스킨 — 차분한 다크 (노랑 배제, 강조 1색) ---------------- */
+/* ============================================================================
+   커맨드 센터 스킨 — GON(BOGON COMMAND CENTER) 실제 값에서 추출
+
+   출처: ~/projects/GON/public/css/style.css :root 및 .wr-panel / .proj-card
+   추측한 값은 없다. 시안(--cyan)·배경(--bg)·글자(--text/--text-dim)는 GON
+   원본 그대로 쓰고, 카드 배경/테두리도 .proj-card 값을 그대로 옮겼다.
+   ============================================================================ */
 :root {
-    --bg: #12151b;
-    --bg-image: linear-gradient(180deg, #171b23 0%, #12151b 45%, #0f1218 100%);
+    /* GON :root 원본 */
+    --bg: #04060B;
+    --cyan: #3FE6FF;
+    --cyan-dim: rgba(63, 230, 255, 0.45);
+    --cyan-glow: rgba(63, 230, 255, 0.6);
+    --text: #DDF6FB;
+    --text-dim: #5B7A85;
 
-    --surface: #1a1f28;      /* 카드 — 배경보다 한 단계 밝게 */
-    --surface-2: #212733;    /* 입력칸 등 한 겹 위 */
-    --surface-3: #2a3140;    /* hover / 선택 */
+    /* 화면 전체 배경 — GON 은 성운 사진 위에 어두운 오버레이를 깔지만
+       여기서는 사진 없이 같은 무드만 낸다(은은한 시안 글로우 + 단색). */
+    --bg-image:
+        radial-gradient(1200px 620px at 50% -10%, rgba(63, 230, 255, 0.07), transparent 62%),
+        radial-gradient(760px 420px at 88% 6%, rgba(63, 230, 255, 0.045), transparent 60%);
 
-    --text: #e8ecf2;
-    --accent: #5aa9e6;       /* 절제된 블루 1색 */
-    --accent-contrast: #08121b;
+    /* 카드 — GON .proj-card 그대로 */
+    --surface: rgba(255, 255, 255, 0.035);
+    --border: rgba(255, 255, 255, 0.09);
+    /* 패널(큰 면) — GON .wr-panel 그대로 */
+    --panel-bg: linear-gradient(165deg, rgba(8, 14, 26, 0.82), rgba(6, 10, 20, 0.62));
+    --panel-border: rgba(63, 230, 255, 0.16);
 
-    --border: #2b3240;
-    --border-soft: #222834;
+    --surface-2: rgba(255, 255, 255, 0.055);   /* 입력칸 등 한 겹 위 */
+    --surface-3: rgba(63, 230, 255, 0.12);     /* hover / 선택 — GON .cmd-chip:hover */
+    --border-soft: rgba(255, 255, 255, 0.06);
 
-    --danger: #e06c6c;
+    --accent: var(--cyan);
+    --accent-contrast: #04121a;
+
+    /* 상태색 — GON .proj-badge / .wr-banner */
+    --ok: hsl(150 80% 62%);
+    --ok-bg: hsl(150 70% 45% / 0.12);
+    --ok-border: hsl(150 70% 50% / 0.4);
+    --warn: hsl(28 90% 58%);
+    --danger: hsl(0 85% 66%);
+    --danger-bg: hsl(0 80% 50% / 0.12);
+    --danger-border: hsl(0 80% 55% / 0.4);
     --danger-contrast: #ffffff;
 
-    --radius-card: 12px;
+    /* GON 은 카드 모서리를 거의 각지게 쓴다(radius 2px 뱃지 외 0) */
+    --radius-card: 2px;
     --card-blur: none;
     --shadow-card: none;
+    --card-hover-border: hsl(190 90% 60% / 0.55);
+    --card-hover-shadow: 0 6px 26px hsl(190 90% 50% / 0.22);
 
-    --nav-bg: #161a22;  --nav-text: var(--text);  --nav-border: #242b38;
-    --nav-hover: #212733;
-    --nav-active-bg: color-mix(in srgb, var(--accent) 16%, transparent);
-    --nav-active-text: var(--accent);
+    /* 사이드바 */
+    --nav-bg: rgba(6, 10, 20, 0.72);
+    --nav-text: var(--text);
+    --nav-border: rgba(63, 230, 255, 0.16);
+    --nav-hover: rgba(63, 230, 255, 0.10);
+    --nav-active-bg: rgba(63, 230, 255, 0.14);
+    --nav-active-text: var(--cyan);
 }
+
 /* ---- 토큰 -> 기존 --tin-* / shadcn 매핑 (손대지 않은 화면도 따라오게) ---- */
 :root {
     --tin-bg: var(--bg);
@@ -626,7 +669,8 @@ body, body * {
 }
 
 /* ---------------- 타이포 4단계 (이 클래스 밖의 크기 금지) ---------------- */
-.ty-h    { font-size: var(--fs-h);    font-weight: var(--fw-h);    line-height: 1.3; color: var(--text); }
+.ty-h    { font-size: var(--fs-h);    font-weight: var(--fw-h);    line-height: 1.3; color: var(--text);
+           font-family: var(--font-display); letter-spacing: 0.5px; }
 .ty-sec  { font-size: var(--fs-sec);  font-weight: var(--fw-sec);  line-height: 1.4; color: var(--text); }
 .ty-body { font-size: var(--fs-body); font-weight: var(--fw-body); line-height: var(--lh); color: var(--text); }
 .ty-med  { font-size: var(--fs-body); font-weight: var(--fw-med);  line-height: var(--lh); color: var(--text); }
@@ -649,7 +693,7 @@ body, body * {
 .ui-card-2 {
     background: var(--surface-2);
     border: 1px solid var(--border-soft);
-    border-radius: calc(var(--radius-card) - 4px);
+    border-radius: var(--radius-card);
     backdrop-filter: var(--card-blur);
     -webkit-backdrop-filter: var(--card-blur);
 }
@@ -663,7 +707,7 @@ body, body * {
     display: inline-flex; align-items: center; gap: 6px;
     padding: 8px 12px;
     border: 1px solid var(--border);
-    border-radius: calc(var(--radius-card) - 4px);
+    border-radius: var(--radius-card);
     background: var(--surface);
     color: var(--text);
     font-size: var(--fs-sub);
@@ -679,47 +723,167 @@ body, body * {
 }
 .ui-btn-accent:hover { filter: brightness(1.06); background: var(--accent); }
 
-/* ============================================================
-   즐겨찾기 — 주간/야간 로컬 테마 (fav-master-detail.tsx)
+/* ============================================================================
+   커맨드 센터 컴포넌트 — GON .proj-card / .wr-panel 구조를 그대로 옮긴 것
 
-   :root 의 전역 토큰은 그대로 두고 .fav-root 서브트리 안에서만 다시
-   정의한다. 다른 화면(통계·파일관리·참고서)은 이 토글의 영향을 받지 않는다.
-   .ty-*/.ui-* 클래스와 이 파일의 컴포넌트는 --bg/--surface/--text/--accent/
-   --border 를 직접 참조하므로(shadcn 의 --primary/--foreground 경유 클래스는
-   쓰지 않는다) 여기 값만 바뀌면 컴포넌트 코드 수정 없이 그대로 반영된다.
-   ============================================================ */
-.fav-root[data-theme="dark"] {
-    /* 앱 기본값과 동일 — 명시적으로 다시 적어 "고정값"임을 보인다 */
-    --bg: #12151b;
-    --surface: #1a1f28;
-    --surface-2: #212733;
-    --surface-3: #2a3140;
-    --text: #e8ecf2;
-    --accent: #5aa9e6;
-    --accent-contrast: #08121b;
-    --border: #2b3240;
-    --border-soft: #222834;
-    --shadow-card: none;
-    --tin-edge: var(--border);
-    --tin-accent: var(--accent);
+   카드 정보 위계(위 -> 아래)도 GON 과 같다:
+     상태점 + 제목 + 상태뱃지  ->  설명  ->  태그행  ->  게이지  ->  수치  ->  주소/액션
+   ============================================================================ */
+
+/* 큰 면(패널) — GON .wr-panel */
+.cc-panel {
+    position: relative;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: var(--radius-card);
+    padding: 12px 14px;
+    min-height: 0;
+}
+/* 패널 제목 — GON .wr-panel-title */
+.cc-panel-title {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 1px;
+    color: hsl(190 90% 72%);
+    text-transform: uppercase;
 }
 
-.fav-root[data-theme="light"] {
-    --bg: #f6f7f9;
-    --surface: #ffffff;
-    --surface-2: #eef1f5;
-    --surface-3: #e4e9f0;
-    --text: #1b2436;                    /* 진한 남색 — 회색 금지 */
-    --accent: #2563eb;
-    --accent-contrast: #ffffff;
-    --border: #dde2ea;
-    --border-soft: #e7eaf0;
-    --shadow-card: 0 1px 2px rgba(16, 24, 40, .04), 0 6px 16px rgba(16, 24, 40, .07);
-    --tin-edge: var(--border);
-    --tin-accent: var(--accent);
+/* 서비스 카드 — GON .proj-card */
+.cc-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-card);
+    padding: 16px 18px;
+    transition: border-color .25s ease, transform .25s ease, box-shadow .25s ease;
+}
+.cc-card:hover {
+    border-color: var(--card-hover-border);
+    transform: translateY(-3px);
+    box-shadow: var(--card-hover-shadow);
+}
+.cc-card.is-selected {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 1px var(--cyan-dim) inset;
 }
 
-.fav-root {
+/* 카드 머리 — 상태점 + 이름 + 뱃지 */
+.cc-head { display: flex; align-items: center; gap: 9px; margin-bottom: 4px; }
+.cc-name {
+    font-family: var(--font-display);
+    font-weight: 600; font-size: 18px; letter-spacing: 0.5px;
+    color: #fff;
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.cc-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; position: relative; }
+.cc-dot.on { background: var(--cyan); box-shadow: 0 0 10px var(--cyan); }
+/* 심장박동 펄스 — GON @keyframes svcPulse */
+.cc-dot.on::after {
+    content: ''; position: absolute; inset: -4px; border-radius: 50%;
+    border: 1.5px solid var(--cyan); animation: ccPulse 1.8s ease-out infinite;
+}
+@keyframes ccPulse {
+    0%   { transform: scale(0.6); opacity: 0.9; }
+    100% { transform: scale(2.1); opacity: 0; }
+}
+.cc-dot.off { background: hsl(0 85% 58%); box-shadow: 0 0 9px hsl(0 85% 55%); }
+
+/* 상태 뱃지 — GON .proj-badge */
+.cc-badge {
+    font-size: 9.5px; letter-spacing: 1.5px; margin-left: auto;
+    padding: 2px 7px; border-radius: 2px; font-weight: 700;
+    white-space: nowrap; flex-shrink: 0;
+}
+.cc-badge.ok   { color: var(--ok);     border: 1px solid var(--ok-border);     background: var(--ok-bg); }
+.cc-badge.off  { color: var(--danger); border: 1px solid var(--danger-border); background: var(--danger-bg); }
+
+/* 설명 / 태그 — GON .proj-desc, .proj-tag */
+.cc-desc {
+    font-size: 11.5px; color: rgba(210, 228, 240, 0.62);
+    margin: 2px 0 8px; line-height: 1.4;
+    white-space: pre-wrap; word-break: break-word;
+}
+.cc-tags { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; flex-wrap: wrap; }
+.cc-tag {
+    font-size: 9.5px; letter-spacing: 0.5px; color: var(--cyan-dim);
+    border: 1px solid rgba(63, 230, 255, 0.18);
+    padding: 1px 6px; border-radius: 2px; white-space: nowrap;
+}
+.cc-stage {
+    font-size: 9.5px; letter-spacing: 1px; padding: 2px 8px;
+    border-radius: 2px; font-weight: 700; white-space: nowrap;
+}
+.cc-stage.run  { color: var(--ok);   background: hsl(150 70% 45% / 0.14); }
+.cc-stage.wait { color: var(--text-dim); background: rgba(255,255,255,0.06); }
+
+/* 게이지 막대 — GON .proj-mini (체력/마력/이동력 자리) */
+.cc-gauges { display: flex; gap: 12px; margin-bottom: 10px; }
+.cc-gauge { flex: 1; min-width: 0; }
+.cc-gauge-label {
+    display: flex; justify-content: space-between;
+    font-size: 9.5px; letter-spacing: 1px; color: var(--text-dim); margin-bottom: 4px;
+}
+.cc-gauge-label b {
+    color: var(--cyan); font-weight: 600; font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+}
+.cc-gauge-bar { height: 4px; background: rgba(255,255,255,0.07); overflow: hidden; border-radius: 2px; }
+.cc-gauge-fill {
+    height: 100%;
+    background: linear-gradient(90deg, hsl(var(--ghue, 190) 90% 50%), hsl(var(--ghue, 190) 90% 66%));
+    transition: width .6s ease;
+}
+/* 값이 아직 없는 게이지 — 자리만 잡아두고 비워둔다 */
+.cc-gauge.is-empty .cc-gauge-label b { color: var(--text-dim); }
+
+/* 수치 줄 — GON .proj-stats */
+.cc-stats {
+    display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px;
+    font-size: 12px; color: rgba(210, 228, 240, 0.85); margin-top: 4px;
+}
+.cc-stats span { display: flex; gap: 5px; }
+.cc-stats b {
+    color: var(--cyan); font-weight: 600;
+    font-variant-numeric: tabular-nums; font-family: var(--font-mono);
+}
+
+/* 주소/메타 — GON .proj-addr (점선 구분선으로 액션 영역과 나눔) */
+.cc-meta {
+    margin-top: auto; padding-top: 9px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.08);
+    display: flex; flex-direction: column; gap: 5px;
+}
+.cc-meta-item { display: flex; align-items: center; gap: 7px; font-size: 11px; min-width: 0; }
+.cc-meta-k { color: var(--text-dim); letter-spacing: 1px; min-width: 44px; flex-shrink: 0; }
+.cc-meta-v {
+    font-family: var(--font-mono); color: var(--cyan-dim);
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* 액션 버튼 — GON .cmd-chip 무드 */
+.cc-btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 8px 12px; border-radius: 2px;
+    border: 1px solid rgba(63, 230, 255, 0.28);
+    background: rgba(63, 230, 255, 0.08);
     color: var(--text);
-    transition: background-color .15s ease, color .15s ease;
+    font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.3px;
+    transition: background .15s, border-color .15s, box-shadow .15s, color .15s;
+}
+.cc-btn:hover:not(:disabled) {
+    border-color: var(--cyan);
+    background: rgba(63, 230, 255, 0.12);
+    box-shadow: 0 0 12px hsl(190 90% 55% / 0.35);
+    color: #fff;
+}
+.cc-btn:disabled { opacity: .45; }
+
+/* 카드 그리드 — GON .wr-process-grid */
+.cc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 14px;
+    align-content: start;
 }
