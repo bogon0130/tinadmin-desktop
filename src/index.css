@@ -881,6 +881,44 @@ body, body * {
 }
 .cc-btn:disabled { opacity: .45; }
 
+/* 이름 옆 직업 — 이름과 같은 크기, 색으로 위계를 나눈다 */
+.cc-job {
+    font-family: var(--font-display);
+    font-weight: 600;
+    font-size: 18px;
+    letter-spacing: 0.5px;
+    color: var(--cyan);
+    flex-shrink: 0;
+}
+
+/* 직업 필터 탭 — GON .cmd-chip 무드 */
+.cc-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.cc-tab {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 7px 14px; border-radius: 2px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-mono); font-size: 12px; letter-spacing: 1px;
+    transition: background .15s, border-color .15s, color .15s, box-shadow .15s;
+}
+.cc-tab:hover {
+    border-color: var(--cyan);
+    background: rgba(63, 230, 255, 0.10);
+}
+.cc-tab.is-on {
+    border-color: var(--cyan);
+    background: rgba(63, 230, 255, 0.14);
+    color: var(--cyan);
+    box-shadow: 0 0 12px hsl(190 90% 55% / 0.30);
+}
+.cc-tab-n {
+    font-size: 10px;
+    color: var(--text-dim);
+    font-variant-numeric: tabular-nums;
+}
+.cc-tab.is-on .cc-tab-n { color: var(--cyan); }
+
 /* 카드 그리드 — GON .wr-process-grid */
 .cc-grid {
     display: grid;
