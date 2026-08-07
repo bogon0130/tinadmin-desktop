@@ -1,7 +1,8 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Loader2, PlugZap, StickyNote } from "lucide-react"
 
 import type { Favorite } from "@/lib/favorites"
+import { EMPTY_STAT, getFavStat, type FavStat } from "@/lib/favstats"
 import { modeLabel, useFavorites } from "./use-favorites"
 
 /**
@@ -17,27 +18,41 @@ import { modeLabel, useFavorites } from "./use-favorites"
  *   0" 처럼 보여서 잘못 읽힌다.
  */
 
-/** 추후 stats 연동 시 값이 들어올 자리 */
-const GAUGES: { key: string; label: string; hue: number }[] = [
-  { key: "hp", label: "체력", hue: 150 },
-  { key: "mp", label: "마력", hue: 190 },
-  { key: "mv", label: "이동", hue: 45 },
-]
+/**
+ * 최대 능력치 — 게임에서 "점수"를 치면 서버에 저장된 값을 읽어 숫자로만 보여준다.
+ *
+ * 막대 게이지를 쓰지 않는 이유: 보여줄 게 "최대값"뿐이라 채울 비율이 없다.
+ * 빈 막대는 "0" 처럼 잘못 읽히기만 한다.
+ *
+ * 아직 접속해서 점수를 치지 않은 캐릭터는 값이 없다 -> "-".
+ */
+function MaxStats({ id }: { id: string }) {
+  const [stat, setStat] = useState<FavStat>(EMPTY_STAT)
 
-function Gauges() {
+  useEffect(() => {
+    let alive = true
+    void getFavStat(id).then((s) => {
+      // 카드가 사라진 뒤 늦게 온 응답으로 상태를 건드리지 않는다
+      if (alive) setStat(s)
+    })
+    return () => {
+      alive = false
+    }
+  }, [id])
+
+  const fmt = (v: number | null) => (v === null ? "-" : v.toLocaleString())
+
   return (
-    <div className="cc-gauges">
-      {GAUGES.map((g) => (
-        <div key={g.key} className="cc-gauge is-empty" style={{ ["--ghue" as string]: g.hue }}>
-          <div className="cc-gauge-label">
-            <span>{g.label}</span>
-            <b>-</b>
-          </div>
-          <div className="cc-gauge-bar">
-            <div className="cc-gauge-fill" style={{ width: 0 }} />
-          </div>
-        </div>
-      ))}
+    <div className="cc-stats" style={{ marginBottom: 10 }}>
+      <span>
+        체력 <b>{fmt(stat.hpMax)}</b>
+      </span>
+      <span>
+        마력 <b>{fmt(stat.mpMax)}</b>
+      </span>
+      <span>
+        이동 <b>{fmt(stat.mvMax)}</b>
+      </span>
     </div>
   )
 }
@@ -163,13 +178,10 @@ export function FavCommandCenter({ reloadKey }: { reloadKey: number }) {
               const connected = Boolean(lastConnect[f.id])
               return (
                 <article key={f.id} className="cc-card">
-                  {/* 머리 — 상태점 + 이름 + 뱃지 */}
+                  {/* 머리 — 상태점 + 이름 */}
                   <div className="cc-head">
                     <span className={`cc-dot ${connected ? "on" : "off"}`} />
                     <span className="cc-name">{f.name}</span>
-                    <span className={`cc-badge ${connected ? "ok" : "off"}`}>
-                      {connected ? "ONLINE" : "IDLE"}
-                    </span>
                   </div>
 
                   <MemoLine fav={f} onSave={saveMemo} />
@@ -182,8 +194,8 @@ export function FavCommandCenter({ reloadKey }: { reloadKey: number }) {
                     <span className="cc-tag">{g.label}</span>
                   </div>
 
-                  {/* 게이지 — 값은 추후 stats 연동 */}
-                  <Gauges />
+                  {/* 최대 능력치 — 서버 /api/favstats/<id> */}
+                  <MaxStats id={f.id} />
 
                   {/* 수치 */}
                   <div className="cc-stats">
@@ -195,20 +207,12 @@ export function FavCommandCenter({ reloadKey }: { reloadKey: number }) {
                     </span>
                   </div>
 
-                  {/* 메타 — 세션 / 서버 / 포트 */}
+                  {/* 메타 — 세션 */}
                   <div className="cc-meta">
                     <div className="cc-meta-item">
                       <span className="cc-meta-k">SESSION</span>
                       <span className="cc-meta-v">{f.session || "-"}</span>
                     </div>
-                    <div className="cc-meta-item">
-                      <span className="cc-meta-k">HOST</span>
-                      <span className="cc-meta-v">
-                        {f.host || "-"}
-                        {f.port ? `:${f.port}` : ""}
-                      </span>
-                    </div>
-
                     <button
                       onClick={() => void connect(f)}
                       disabled={busy !== null}

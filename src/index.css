@@ -799,9 +799,10 @@ body, body * {
 .cc-badge.ok   { color: var(--ok);     border: 1px solid var(--ok-border);     background: var(--ok-bg); }
 .cc-badge.off  { color: var(--danger); border: 1px solid var(--danger-border); background: var(--danger-bg); }
 
-/* 설명 / 태그 — GON .proj-desc, .proj-tag */
+/* 설명(메모) / 태그 — GON .proj-desc, .proj-tag
+   메모는 실제로 읽는 내용이라 GON 원본(0.62 투명)보다 밝게 본문색 그대로 쓴다. */
 .cc-desc {
-    font-size: 11.5px; color: rgba(210, 228, 240, 0.62);
+    font-size: 11.5px; color: var(--text);
     margin: 2px 0 8px; line-height: 1.4;
     white-space: pre-wrap; word-break: break-word;
 }
