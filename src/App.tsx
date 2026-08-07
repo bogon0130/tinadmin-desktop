@@ -38,7 +38,7 @@ import { NotesView } from "@/components/notes-view"
 import { StatsView } from "@/components/stats-view"
 import { FilesView } from "@/components/files-view"
 import { ComboView } from "@/components/combo-view"
-import { GroupDocView } from "@/components/group-doc-view"
+import { GroupView } from "@/components/groups/group-view"
 import { GuideView } from "@/components/guide-view"
 import { FavoritesView } from "@/components/favorites-view"
 import { applyUiBase } from "@/lib/ui-base"
@@ -270,7 +270,7 @@ export default function App() {
           )}
           {view === "guide" && <GuideView />}
           {GROUP_DOCS[view] && (
-            <GroupDocView key={view} docKey={GROUP_DOCS[view]} />
+            <GroupView key={view} groupName={GROUP_DOCS[view]} />
           )}
         </main>
       </div>
