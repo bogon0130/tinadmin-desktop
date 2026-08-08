@@ -7,27 +7,41 @@ import { getApiUrl, getToken } from "./api"
  *   favstats.ts/groups.ts/notes-store.ts 와 같은 패턴 — request() 를 내보내지
  *   않아서 재사용할 수 없으니 주소·토큰만 빌려 쓴다.
  *
- * 서버는 raw_line(원문 한 줄)+부위만 준다. 컬럼을 여기서도 억지로 쪼개지
- * 않는다 — 화면에서 탭(\t) 기준으로 그때그때 나눠 표시한다.
+ * 서버는 엑셀(items_data/item.xlsx) 시트를 그대로 옮긴 구조를 준다 — 부위마다
+ * 컬럼 구성이 다르므로(무기=타격치/평타/마법, 신발=종류 등) columns 로 그
+ * 부위의 실제 헤더 순서를, rows 로 그 헤더 키를 그대로 쓰는 값 객체를 받는다.
+ * 컬럼을 여기서 다시 쪼개거나 이름을 바꾸지 않는다.
  */
 
-export interface ItemRow {
-  부위: string
-  raw_line: string
+export interface ItemsData {
+  parts: string[]
+  columns: Record<string, string[]>
+  rows: Array<Record<string, unknown>>
 }
 
-/** 실패해도 던지지 않는다 — 화면이 빈 목록으로만 뜨고 죽지 않는다. */
-export async function getItems(): Promise<ItemRow[]> {
+const EMPTY_ITEMS: ItemsData = { parts: [], columns: {}, rows: [] }
+
+/** 실패해도 던지지 않는다 — 화면이 빈 구조로만 뜨고 죽지 않는다. */
+export async function getItems(): Promise<ItemsData> {
   const token = getToken()
   const headers: Record<string, string> = { "Content-Type": "application/json" }
   if (token) headers.Authorization = `Bearer ${token}`
 
   try {
     const res = await fetch(`${getApiUrl()}/api/items`, { headers })
-    if (!res.ok) return []
+    if (!res.ok) return { ...EMPTY_ITEMS }
     const d = (await res.json()) as unknown
-    return Array.isArray(d) ? (d as ItemRow[]) : []
+    if (
+      d &&
+      typeof d === "object" &&
+      Array.isArray((d as ItemsData).parts) &&
+      typeof (d as ItemsData).columns === "object" &&
+      Array.isArray((d as ItemsData).rows)
+    ) {
+      return d as ItemsData
+    }
+    return { ...EMPTY_ITEMS }
   } catch {
-    return []
+    return { ...EMPTY_ITEMS }
   }
 }
