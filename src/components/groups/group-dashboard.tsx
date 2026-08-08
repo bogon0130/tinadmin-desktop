@@ -463,8 +463,8 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
           placeholder="그룹 메모"
         />
 
-        {/* 캐릭터 카드 세로 나열 (실제 tmux 창번호 순서), 단일 컬럼 */}
-        <div className="ui-stack-lg">
+        {/* 캐릭터 카드 2열 배치 (실제 tmux 창번호 순서), 1000px 이하에서 1열로 전환 */}
+        <div className="cc-card-grid">
           {order.length === 0 && !groupLoading && (
             <div className="cc-panel ty-sub">그룹 정보를 불러오지 못했습니다.</div>
           )}

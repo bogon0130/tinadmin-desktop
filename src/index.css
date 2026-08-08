@@ -702,6 +702,17 @@ body, body * {
 .ui-sections  { display: flex; flex-direction: column; gap: var(--gap-sec); }
 .ui-row       { display: flex; align-items: center; gap: var(--gap); }
 
+/* 그룹 대시보드 카드 — 2열, 좁은 화면에서 1열로 전환 */
+.cc-card-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--gap-lg);
+    align-items: start;
+}
+@media (max-width: 1000px) {
+    .cc-card-grid { grid-template-columns: 1fr; }
+}
+
 /* 버튼 — 스타일과 무관하게 같은 리듬 */
 .ui-btn {
     display: inline-flex; align-items: center; gap: 6px;

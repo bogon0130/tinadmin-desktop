@@ -81,7 +81,8 @@ export default function App() {
   // 접속 빌더에서 즐겨찾기를 저장하면 이 값을 올려 목록을 다시 읽게 한다
   const [favReload, setFavReload] = useState(0)
   // 왼쪽 사이드바 폭 — 경계를 끌어 조절하고 재시작해도 유지된다.
-  const [navW, setNavW] = usePanelWidth("tin.nav.width", 288, 200, 560)
+  // 기본값은 최대한 축소된 상태(min)로 시작한다 — 콘텐츠 영역을 넓게 쓰기 위함.
+  const [navW, setNavW] = usePanelWidth("tin.nav.width", 200, 200, 560)
   const [showSettings, setShowSettings] = useState(false)
   const [urlDraft, setUrlDraft] = useState(getApiUrl())
   const [themeDraft, setThemeDraft] = useState<ThemeSettings>(() => loadTheme())
