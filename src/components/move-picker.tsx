@@ -25,7 +25,8 @@ export function MovePickerDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+      className="fixed inset-0 z-50 flex items-center justify-center p-6"
+      style={{ backgroundColor: "rgba(0, 0, 0, 0.6)" }}
       onClick={onClose}
     >
       <div
