@@ -239,18 +239,18 @@ function IgnoreCard({ label, cmd }: { label: string; cmd: string }) {
   const [done, setDone] = useState(false)
   return (
     <div
-      className="cc-panel"
       style={{
-        padding: 10,
-        display: "flex",
+        display: "inline-flex",
         alignItems: "center",
-        justifyContent: "space-between",
-        gap: 8,
+        gap: 6,
+        padding: "4px 6px 4px 10px",
+        borderRadius: 2,
+        border: "1px solid var(--border)",
+        background: "var(--surface-2)",
+        flexShrink: 0,
       }}
     >
-      <span className="ty-sub" style={{ fontSize: 12 }}>
-        {label}
-      </span>
+      <span style={{ fontSize: 11.5, color: "#fff", whiteSpace: "nowrap" }}>{label}</span>
       <button
         onClick={async () => {
           if (await copyText(cmd)) {
@@ -262,16 +262,17 @@ function IgnoreCard({ label, cmd }: { label: string; cmd: string }) {
           }
         }}
         className="cc-btn"
+        style={{ padding: "3px 8px", fontSize: 10.5 }}
         title={cmd}
       >
-        {done ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        {done ? <Check className="size-3" /> : <Copy className="size-3" />}
         {done ? "복사됨" : "복사"}
       </button>
     </div>
   )
 }
 
-/** 한방 접속 복사칸 바로 아래에 붙는 작은 섹션 — 큰 카드 대신 6개 소형 카드를 2열로. */
+/** 한방 접속 복사칸 바로 아래에 붙는 작은 섹션 — 6개 카드를 한 줄에 나란히, 좁아지면 자동 줄바꿈. */
 function IgnoreControlsSection() {
   return (
     <div className="cc-panel">
@@ -281,7 +282,7 @@ function IgnoreControlsSection() {
       <div className="ty-sub" style={{ marginBottom: 10 }}>
         멈추려는 캐릭터 창 하나에 붙여넣기 (붙여넣은 그 창만 적용됨). 액션·줄임말·틱커를 잠시 멈추거나 다시 켠다.
       </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {IGNORE_CARDS.map((c) => (
           <IgnoreCard key={c.label} label={c.label} cmd={c.cmd} />
         ))}
