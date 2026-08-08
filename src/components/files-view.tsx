@@ -81,6 +81,23 @@ function fmtSize(n: number) {
   return n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 }
 
+const GROUP_TABS = ["천마신군그룹", "한비광그룹", "기본설정그룹"] as const
+type GroupTab = (typeof GROUP_TABS)[number]
+
+/**
+ * 폴더 경로(dir, 최상위 파일은 "") -> 그룹 탭.
+ *
+ * 실제 tin/ 폴더명이 "천마신군그룹"/"한비광그룹" 그대로라 그 접두사로만
+ * 가른다. 그 둘에 안 속하는 나머지 전부(1_기본/2_교황/2_대부/2_마왕/2_장군/
+ * 3_직업별_자반/_combos/stats/최상위 낱개 파일)는 "기본설정그룹"으로 묶는다
+ * — 애매한 파일은 없었다(0단계 조사에서 실측 확인).
+ */
+function groupOfDir(dir: string): GroupTab {
+  if (dir === "천마신군그룹" || dir.startsWith("천마신군그룹/")) return "천마신군그룹"
+  if (dir === "한비광그룹" || dir.startsWith("한비광그룹/")) return "한비광그룹"
+  return "기본설정그룹"
+}
+
 /**
  * tin 파일 관리 (1단계: 읽기 + 편집/저장).
  *
@@ -127,6 +144,8 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
   const [tableType, setTableType] = useState<TableType>("action")
   const [tableDirty, setTableDirty] = useState(false)
   const [tableSaving, setTableSaving] = useState(false)
+  // 파일 트리 위 그룹 탭 — 기본은 천마신군그룹
+  const [groupTab, setGroupTab] = useState<GroupTab>("천마신군그룹")
 
   const dirty = current !== null && draft !== current.content
   const meta = files.find((f) => f.name === current?.name) ?? null
@@ -579,6 +598,28 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
           </button>
         </div>
 
+        {/* 그룹 탭 — 천마신군그룹 / 한비광그룹 / 기본설정그룹. 트리 표시만 좁힌다(데이터는 그대로). */}
+        <div
+          className="flex gap-1 border-b px-2 py-2"
+          style={{ borderColor: "var(--tin-edge)" }}
+        >
+          {GROUP_TABS.map((g) => (
+            <button
+              key={g}
+              onClick={() => setGroupTab(g)}
+              className="flex-1 truncate rounded-md border px-1.5 py-1.5 text-center transition"
+              style={{
+                fontSize: "var(--tin-fs-sm)",
+                borderColor: groupTab === g ? "var(--tin-accent)" : "var(--tin-edge)",
+                background: groupTab === g ? "rgb(var(--tin-accent-rgb) / 0.14)" : "transparent",
+                color: groupTab === g ? "var(--tin-accent)" : "var(--tin-fg)",
+              }}
+            >
+              {g}
+            </button>
+          ))}
+        </div>
+
         {(() => {
           // 폴더별로 묶는다. 폴더가 비어 있어도 목록에 나오도록 dirs 를 합친다.
           const groups = new Map<string, TinFileMeta[]>()
@@ -634,11 +675,14 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
           }
 
           const out: React.ReactNode[] = []
-          // 최상위 파일 먼저
-          for (const f of groups.get("") ?? []) out.push(renderFile(f, false))
+          // 최상위 파일 먼저 — 최상위(dir="")는 항상 기본설정그룹 소속이다
+          if (groupOfDir("") === groupTab) {
+            for (const f of groups.get("") ?? []) out.push(renderFile(f, false))
+          }
 
-          // 폴더들
+          // 폴더들 — 선택된 그룹 탭에 속하는 폴더만 보여준다(데이터 자체는 안 건드림)
           for (const d of [...groups.keys()].filter(Boolean).sort()) {
+            if (groupOfDir(d) !== groupTab) continue
             const items = groups.get(d) ?? []
             const open_ = !collapsed.has(d)
             out.push(
