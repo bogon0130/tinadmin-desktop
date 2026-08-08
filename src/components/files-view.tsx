@@ -8,8 +8,6 @@ import {
 import {
   AlertTriangle,
   Zap,
-  ChevronDown,
-  ChevronRight,
   FilePlus2,
   FolderPlus,
   FolderInput,
@@ -23,7 +21,6 @@ import {
   Trash2,
 } from "lucide-react"
 import { toast } from "sonner"
-import { usePersistentSet } from "@/lib/persist"
 import { applyCheck, applyNow, type ApplyCheck } from "@/lib/api"
 
 import {
@@ -98,6 +95,13 @@ function groupOfDir(dir: string): GroupTab {
   return "기본설정그룹"
 }
 
+/** 그룹의 "루트" dir — 그룹 이름과 같은 폴더(천마/한비광)거나 최상위("", 기본설정그룹). */
+function groupRootDir(g: GroupTab): string {
+  if (g === "천마신군그룹") return "천마신군그룹"
+  if (g === "한비광그룹") return "한비광그룹"
+  return ""
+}
+
 /**
  * tin 파일 관리 (1단계: 읽기 + 편집/저장).
  *
@@ -109,9 +113,6 @@ function groupOfDir(dir: string): GroupTab {
 export function FilesView({ openFile }: { openFile?: string | null }) {
   const [files, setFiles] = useState<TinFileMeta[]>([])
   const [dirs, setDirs] = useState<string[]>([])
-  // ★localStorage 에 유지한다★ 메뉴를 옮기면 이 컴포넌트가 언마운트되므로
-  //   useState 만으로는 접어둔 폴더가 다시 펼쳐진다.
-  const [collapsed, setCollapsed] = usePersistentSet("tin.files.collapsed")
   // [새 파일] 을 누를 때 어느 폴더에 만들지 ('' = 최상위)
   const [targetDir, setTargetDir] = useState("")
   // 드래그 중인 파일 / 드롭 대상 폴더 하이라이트
@@ -146,6 +147,9 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
   const [tableSaving, setTableSaving] = useState(false)
   // 파일 트리 위 그룹 탭 — 기본은 천마신군그룹
   const [groupTab, setGroupTab] = useState<GroupTab>("천마신군그룹")
+  // 2단(폴더) 선택 — null 이면 "아직 안 골랐다"(하위 폴더가 있는 그룹의 기본 상태).
+  // 하위 폴더가 없는 그룹은 렌더 시점에 자동으로 그룹 루트를 쓴다(폴더 단 자체를 생략).
+  const [selectedDir, setSelectedDir] = useState<string | null>(null)
 
   const dirty = current !== null && draft !== current.content
   const meta = files.find((f) => f.name === current?.name) ?? null
@@ -542,72 +546,36 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
     }
   }
 
-  return (
-    <div className="flex min-h-0 flex-1">
-      {/* 좌측: 파일 목록 */}
-      <div
-        className="tin-scroll w-64 shrink-0 overflow-y-auto border-r"
-        style={{
-          borderColor: dropDir === "" ? "var(--tin-accent)" : "var(--tin-edge)",
-        }}
-        onDragOver={(e) => { e.preventDefault(); setDropDir("") }}
-        onDrop={(e) => {
-          e.preventDefault()
-          const f = e.dataTransfer.getData("text/plain") || dragFile
-          if (f && f.includes("/")) void handleDrop(f, "")
-        }}
-      >
-        <div
-          className="flex items-center gap-2 border-b px-3 py-2.5"
-          style={{ borderColor: "var(--tin-edge)" }}
-        >
-          <span
-            className="tin-accent font-semibold tracking-wide"
-            style={{ fontSize: "var(--tin-fs-sm)" }}
-          >
-            tin 파일 {files.length}개
-          </span>
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => void handleCreateDir()}
-            title="새 폴더 만들기"
-            className="ml-auto flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
-            style={{ color: "var(--tin-accent)" }}
-          >
-            <FolderPlus className="size-3.5" />
-          </button>
-          <button
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => { setTargetDir(""); setDialog("create") }}
-            title="새 파일 만들기 (최상위)"
-            className="flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
-            style={{ color: "var(--tin-accent)" }}
-          >
-            <FilePlus2 className="size-3.5" />
-          </button>
-          <button
-            onClick={() => void loadList()}
-            title="목록 새로고침"
-            className="flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
-          >
-            {loadingList ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <RefreshCw className="size-3.5" />
-            )}
-          </button>
-        </div>
+  // 이 그룹의 진짜 하위 폴더(그룹 루트 자신은 뺀다) — 오름차순
+  const rootDir = groupRootDir(groupTab)
+  const subfolders = dirs.filter((d) => groupOfDir(d) === groupTab && d !== rootDir).sort()
+  // 3단(파일)에 쓸 dir. 하위 폴더가 없는 그룹은 고를 게 없으니 루트를 바로 쓴다
+  // (폴더 단 자체가 생략되는 경우). 하위 폴더가 있는 그룹은 사용자가 직접
+  // 골라야 한다 — 자동선택 안 함(작업서에서 허용한 선택지).
+  const effectiveDir = selectedDir ?? (subfolders.length === 0 ? rootDir : null)
+  const filesInDir = effectiveDir === null ? [] : files.filter((f) => (f.dir ?? "") === effectiveDir)
 
-        {/* 그룹 탭 — 천마신군그룹 / 한비광그룹 / 기본설정그룹. 트리 표시만 좁힌다(데이터는 그대로). */}
-        <div
-          className="flex gap-1 border-b px-2 py-2"
-          style={{ borderColor: "var(--tin-edge)" }}
-        >
+  function selectGroup(g: GroupTab) {
+    setGroupTab(g)
+    setSelectedDir(null) // 그룹 바꾸면 폴더 선택 초기화 (파일 선택은 current 를 그대로 둔다 — 새 목록에 없으면 강조만 자연히 사라진다)
+  }
+  function selectDir(d: string) {
+    setSelectedDir(d) // 폴더 바꾸면 파일 "선택 강조"는 filesInDir 가 바뀌며 자연히 갱신된다
+  }
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* 1단: 그룹 탭 + 파일관리 공용 버튼 */}
+      <div
+        className="flex shrink-0 items-center gap-2 border-b px-3 py-2"
+        style={{ borderColor: "var(--tin-edge)" }}
+      >
+        <div className="flex gap-1">
           {GROUP_TABS.map((g) => (
             <button
               key={g}
-              onClick={() => setGroupTab(g)}
-              className="flex-1 truncate rounded-md border px-1.5 py-1.5 text-center transition"
+              onClick={() => selectGroup(g)}
+              className="rounded-md border px-3 py-1.5 transition"
               style={{
                 fontSize: "var(--tin-fs-sm)",
                 borderColor: groupTab === g ? "var(--tin-accent)" : "var(--tin-edge)",
@@ -619,75 +587,79 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
             </button>
           ))}
         </div>
+        <span
+          className="ml-2"
+          style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}
+        >
+          tin 파일 {files.length}개
+        </span>
+        <button
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => void handleCreateDir()}
+          title="새 폴더 만들기"
+          className="ml-auto flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
+          style={{ color: "var(--tin-accent)" }}
+        >
+          <FolderPlus className="size-3.5" />
+        </button>
+        <button
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => { setTargetDir(rootDir); setDialog("create") }}
+          title="새 파일 만들기 (현재 그룹 최상위)"
+          className="flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
+          style={{ color: "var(--tin-accent)" }}
+        >
+          <FilePlus2 className="size-3.5" />
+        </button>
+        <button
+          onClick={() => void loadList()}
+          title="목록 새로고침"
+          className="flex size-6 items-center justify-center rounded hover:bg-[var(--tin-panel2)]"
+        >
+          {loadingList ? (
+            <Loader2 className="size-3.5 animate-spin" />
+          ) : (
+            <RefreshCw className="size-3.5" />
+          )}
+        </button>
+      </div>
 
-        {(() => {
-          // 폴더별로 묶는다. 폴더가 비어 있어도 목록에 나오도록 dirs 를 합친다.
-          const groups = new Map<string, TinFileMeta[]>()
-          groups.set("", [])
-          for (const d of dirs) groups.set(d, [])
-          for (const f of files) {
-            const k = f.dir ?? ""
-            if (!groups.has(k)) groups.set(k, [])
-            groups.get(k)!.push(f)
-          }
+      {/* 2단: 하위 폴더 (가로, 없으면 생략) */}
+      {subfolders.length > 0 && (
+        <div
+          className="tin-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3 py-2"
+          style={{ borderColor: "var(--tin-edge)" }}
+        >
+          {/* 그룹 루트 — 그룹 이름과 같은 폴더에 바로 든 파일(있으면)도 여기로 돌아와 볼 수 있다 */}
+          <button
+            onDragOver={(e) => { e.preventDefault(); setDropDir(rootDir) }}
+            onDragLeave={() => setDropDir((p) => (p === rootDir ? null : p))}
+            onDrop={(e) => {
+              e.preventDefault()
+              const f = e.dataTransfer.getData("text/plain") || dragFile
+              if (f) void handleDrop(f, rootDir)
+            }}
+            onClick={() => selectDir(rootDir)}
+            className="flex shrink-0 items-center gap-1 rounded-md border px-2.5 py-1.5"
+            style={{
+              fontSize: "var(--tin-fs-sm)",
+              borderColor: effectiveDir === rootDir ? "var(--tin-accent)" : (dropDir === rootDir ? "var(--tin-accent)" : "var(--tin-edge)"),
+              background: dropDir === rootDir
+                ? "rgb(var(--tin-accent-rgb) / 0.18)"
+                : effectiveDir === rootDir ? "var(--tin-panel2)" : "transparent",
+              color: effectiveDir === rootDir ? "var(--tin-accent)" : "var(--tin-fg)",
+            }}
+          >
+            <Folder className="size-3.5" />
+            최상위
+          </button>
 
-          const renderFile = (f: TinFileMeta, indent: boolean) => {
-            const active = current?.name === f.name
+          {subfolders.map((d) => {
+            const items = files.filter((f) => f.dir === d)
+            const label = d.slice(d.lastIndexOf("/") + 1)
             return (
-              <button
-                key={f.name}
-                draggable={!f.read_only}
-                onDragStart={(e) => {
-                  setDragFile(f.name)
-                  e.dataTransfer.effectAllowed = "move"
-                  e.dataTransfer.setData("text/plain", f.name)
-                }}
-                onDragEnd={() => { setDragFile(null); setDropDir(null) }}
-                onClick={() => void open(f.name)}
-                title={f.read_only ? "읽기 전용 (이동 불가)" : "끌어서 폴더로 옮길 수 있습니다"}
-                className="block w-full border-b px-3 py-2 text-left transition"
-                style={{
-                  borderColor: "var(--tin-edge-soft)",
-                  background: active ? "var(--tin-panel2)" : "transparent",
-                  paddingLeft: indent ? 22 : 12,
-                  opacity: dragFile === f.name ? 0.45 : 1,
-                  cursor: f.read_only ? "default" : "grab",
-                }}
-              >
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="tin-mono truncate"
-                    style={{ color: active ? "var(--tin-accent)" : "var(--tin-fg)" }}
-                  >
-                    {f.base ?? f.name}
-                  </span>
-                  {f.has_plain_secret && (
-                    <KeyRound className="size-3 shrink-0" style={{ color: "#f5a524" }} />
-                  )}
-                  {f.read_only && <Lock className="size-3 shrink-0 opacity-70" />}
-                </div>
-                <div style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}>
-                  {fmtSize(f.size)} · {f.mtime.slice(5, 16)}
-                  {f.referrer_count > 0 && ` · 참조 ${f.referrer_count}`}
-                </div>
-              </button>
-            )
-          }
-
-          const out: React.ReactNode[] = []
-          // 최상위 파일 먼저 — 최상위(dir="")는 항상 기본설정그룹 소속이다
-          if (groupOfDir("") === groupTab) {
-            for (const f of groups.get("") ?? []) out.push(renderFile(f, false))
-          }
-
-          // 폴더들 — 선택된 그룹 탭에 속하는 폴더만 보여준다(데이터 자체는 안 건드림)
-          for (const d of [...groups.keys()].filter(Boolean).sort()) {
-            if (groupOfDir(d) !== groupTab) continue
-            const items = groups.get(d) ?? []
-            const open_ = !collapsed.has(d)
-            out.push(
               <div
-                key={`dir-${d}`}
+                key={d}
                 onDragOver={(e) => { e.preventDefault(); setDropDir(d) }}
                 onDragLeave={() => setDropDir((p) => (p === d ? null : p))}
                 onDrop={(e) => {
@@ -695,40 +667,31 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
                   const f = e.dataTransfer.getData("text/plain") || dragFile
                   if (f) void handleDrop(f, d)
                 }}
-                className="flex items-center gap-1 border-b px-2 py-1.5"
+                className="flex shrink-0 items-center gap-1 rounded-md border pl-2.5 pr-1 py-1"
                 style={{
-                  borderColor: dropDir === d ? "var(--tin-accent)" : "var(--tin-edge)",
+                  fontSize: "var(--tin-fs-sm)",
+                  borderColor: dropDir === d
+                    ? "var(--tin-accent)"
+                    : effectiveDir === d ? "var(--tin-accent)" : "var(--tin-edge)",
                   background: dropDir === d
                     ? "rgb(var(--tin-accent-rgb) / 0.18)"
-                    : "var(--tin-panel2)",
+                    : effectiveDir === d ? "var(--tin-panel2)" : "transparent",
                 }}
               >
                 <button
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() =>
-                    setCollapsed((s) => {
-                      const n = new Set(s)
-                      n.has(d) ? n.delete(d) : n.add(d)
-                      return n
-                    })
-                  }
-                  className="flex items-center gap-1"
-                  style={{ fontSize: "var(--tin-fs-sm)", color: "var(--tin-accent)" }}
+                  onClick={() => selectDir(d)}
+                  className="flex items-center gap-1 py-0.5"
+                  style={{ color: effectiveDir === d ? "var(--tin-accent)" : "var(--tin-fg)" }}
                 >
-                  {open_ ? (
-                    <ChevronDown className="size-3.5" />
-                  ) : (
-                    <ChevronRight className="size-3.5" />
-                  )}
                   <Folder className="size-3.5" />
-                  <span className="tin-mono">{d}</span>
+                  <span className="tin-mono">{label}</span>
                   <span style={{ opacity: 0.7 }}>{items.length}</span>
                 </button>
                 <button
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => { setTargetDir(d); setDialog("create") }}
                   title={`${d} 안에 새 파일`}
-                  className="ml-auto flex size-5 items-center justify-center rounded hover:bg-[var(--tin-bg)]"
+                  className="flex size-5 items-center justify-center rounded hover:bg-[var(--tin-bg)]"
                 >
                   <FilePlus2 className="size-3" />
                 </button>
@@ -751,16 +714,67 @@ export function FilesView({ openFile }: { openFile?: string | null }) {
                     <Trash2 className="size-3" />
                   </button>
                 )}
-              </div>,
+              </div>
             )
-            if (open_) for (const f of items) out.push(renderFile(f, true))
-          }
-          return out
-        })()}
+          })}
+        </div>
+      )}
+
+      {/* 3단: 파일 (가로, 넘치면 스크롤) */}
+      <div
+        className="tin-scroll flex shrink-0 items-center gap-1.5 overflow-x-auto border-b px-3 py-2"
+        style={{ borderColor: "var(--tin-edge)" }}
+      >
+        {effectiveDir === null ? (
+          <span style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.6 }}>
+            위에서 폴더를 먼저 고르세요.
+          </span>
+        ) : filesInDir.length === 0 ? (
+          <span style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.6 }}>
+            이 폴더엔 파일이 없습니다.
+          </span>
+        ) : (
+          filesInDir.map((f) => {
+            const active = current?.name === f.name
+            return (
+              <button
+                key={f.name}
+                draggable={!f.read_only}
+                onDragStart={(e) => {
+                  setDragFile(f.name)
+                  e.dataTransfer.effectAllowed = "move"
+                  e.dataTransfer.setData("text/plain", f.name)
+                }}
+                onDragEnd={() => { setDragFile(null); setDropDir(null) }}
+                onClick={() => void open(f.name)}
+                title={f.read_only ? "읽기 전용 (이동 불가)" : "끌어서 폴더 칩으로 옮길 수 있습니다"}
+                className="flex shrink-0 items-center gap-1.5 rounded-md border px-2.5 py-1.5 transition"
+                style={{
+                  borderColor: active ? "var(--tin-accent)" : "var(--tin-edge)",
+                  background: active ? "var(--tin-panel2)" : "transparent",
+                  opacity: dragFile === f.name ? 0.45 : 1,
+                  cursor: f.read_only ? "default" : "grab",
+                  fontSize: "var(--tin-fs-sm)",
+                }}
+              >
+                <span
+                  className="tin-mono truncate"
+                  style={{ color: active ? "var(--tin-accent)" : "var(--tin-fg)", maxWidth: 200 }}
+                >
+                  {f.base ?? f.name}
+                </span>
+                {f.has_plain_secret && (
+                  <KeyRound className="size-3 shrink-0" style={{ color: "#f5a524" }} />
+                )}
+                {f.read_only && <Lock className="size-3 shrink-0 opacity-70" />}
+              </button>
+            )
+          })
+        )}
       </div>
 
-      {/* 우측: 편집기 */}
-      <div className="flex min-w-0 flex-1 flex-col">
+      {/* 편집기 — 가로 폭 전체 */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* 상시 배너 */}
         <div
           className="shrink-0 border-b px-4 py-2 leading-relaxed"
