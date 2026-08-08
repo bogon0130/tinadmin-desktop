@@ -146,23 +146,25 @@ export function ItemsView() {
             </div>
           )}
           {part && filteredSorted.length > 0 && (
-            <table style={{ borderCollapse: "collapse", width: "100%", fontSize: 12.5 }}>
+            <table style={{ borderCollapse: "collapse", width: "auto", fontSize: 12.5 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                  {columns.map((col) =>
-                    col === "레벨" ? (
+                  {columns.map((col, i) => {
+                    const lastCol = i === columns.length - 1
+                    return col === "레벨" ? (
                       <th
                         key={col}
                         onClick={toggleLevelSort}
                         title="클릭: 레벨 오름차순 / 다시 클릭: 원래 순서"
                         style={{
-                          padding: "8px 10px",
+                          padding: "8px 7px",
                           textAlign: "left",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-mono)",
                           color: sortMode === "level-asc" ? "var(--cyan)" : "var(--text-dim)",
                           cursor: "pointer",
                           userSelect: "none",
+                          borderRight: lastCol ? undefined : "1px solid var(--border-soft)",
                         }}
                       >
                         <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
@@ -178,35 +180,41 @@ export function ItemsView() {
                       <th
                         key={col}
                         style={{
-                          padding: "8px 10px",
+                          padding: "8px 7px",
                           textAlign: "left",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-mono)",
                           color: "var(--text-dim)",
+                          borderRight: lastCol ? undefined : "1px solid var(--border-soft)",
                         }}
                       >
                         {col}
                       </th>
-                    ),
-                  )}
+                    )
+                  })}
                 </tr>
               </thead>
               <tbody>
                 {filteredSorted.map((row, idx) => (
                   <tr key={idx} style={{ borderBottom: "1px solid var(--border-soft)" }}>
-                    {columns.map((col, i) => (
-                      <td
-                        key={col}
-                        style={{
-                          padding: "6px 10px",
-                          whiteSpace: "nowrap",
-                          fontFamily: i === 0 ? "var(--font-mono)" : "inherit",
-                          color: col === "이름" ? "var(--text)" : "rgba(210, 228, 240, 0.85)",
-                        }}
-                      >
-                        {cellText(row[col]) || " "}
-                      </td>
-                    ))}
+                    {columns.map((col, i) => {
+                      const lastCol = i === columns.length - 1
+                      return (
+                        <td
+                          key={col}
+                          style={{
+                            padding: "6px 7px",
+                            textAlign: col === "이름" ? "left" : undefined,
+                            whiteSpace: "nowrap",
+                            fontFamily: i === 0 ? "var(--font-mono)" : "inherit",
+                            color: col === "이름" ? "var(--text)" : "rgba(210, 228, 240, 0.85)",
+                            borderRight: lastCol ? undefined : "1px solid var(--border-soft)",
+                          }}
+                        >
+                          {cellText(row[col]) || " "}
+                        </td>
+                      )
+                    })}
                   </tr>
                 ))}
               </tbody>
