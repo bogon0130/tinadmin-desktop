@@ -146,7 +146,7 @@ export function ItemsView() {
             </div>
           )}
           {part && filteredSorted.length > 0 && (
-            <table style={{ borderCollapse: "collapse", width: "auto", fontSize: 12.5 }}>
+            <table style={{ borderCollapse: "collapse", width: "auto", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
                   {columns.map((col, i) => {
@@ -157,7 +157,7 @@ export function ItemsView() {
                         onClick={toggleLevelSort}
                         title="클릭: 레벨 오름차순 / 다시 클릭: 원래 순서"
                         style={{
-                          padding: "8px 7px",
+                          padding: "10px 10px",
                           textAlign: "left",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-mono)",
@@ -180,7 +180,7 @@ export function ItemsView() {
                       <th
                         key={col}
                         style={{
-                          padding: "8px 7px",
+                          padding: "10px 10px",
                           textAlign: "left",
                           whiteSpace: "nowrap",
                           fontFamily: "var(--font-mono)",
@@ -203,7 +203,7 @@ export function ItemsView() {
                         <td
                           key={col}
                           style={{
-                            padding: "6px 7px",
+                            padding: "8px 10px",
                             textAlign: col === "이름" ? "left" : undefined,
                             whiteSpace: "nowrap",
                             fontFamily: i === 0 ? "var(--font-mono)" : "inherit",
