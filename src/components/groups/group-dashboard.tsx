@@ -314,6 +314,24 @@ function orderedNames(g: GroupInfo): string[] {
   return g.windows.filter((w) => w !== "복병")
 }
 
+/**
+ * 천마신군그룹 카드 "화면 표시" 순서 — 요청된 고정 순서.
+ *
+ * ★pane 번호(windowIndex)는 안 건드린다★
+ *   respawnCmd 는 order(실제 tmux 창번호 순서) 안에서의 위치를 그대로 pane
+ *   번호로 쓴다. 여기서 만드는 배열은 카드가 화면에 그려지는 "순서"만
+ *   바꾸는 용도라, 실제 pane 번호는 항상 order.indexOf(name) 으로 따로
+ *   구해서 넘긴다 — 접속 명령이 틀어지지 않는다.
+ */
+const CHUNMA_DISPLAY_ORDER = ["천마신군", "진풍백", "매유진", "벽력자", "천운악", "커"]
+
+/** 한비광그룹은 기존 순서(order) 그대로, 천마신군그룹만 위 고정 순서로 재배열한다. */
+function displayOrder(groupName: string, names: string[]): string[] {
+  if (groupName !== "천마신군그룹") return names
+  const rank = new Map(CHUNMA_DISPLAY_ORDER.map((n, i) => [n, i]))
+  return [...names].sort((a, b) => (rank.get(a) ?? 99) - (rank.get(b) ?? 99))
+}
+
 export function GroupDashboard({ groupName }: { groupName: string }) {
   const [group, setGroup] = useState<GroupInfo | null>(null)
   const [groupLoading, setGroupLoading] = useState(true)
@@ -463,15 +481,16 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
           placeholder="그룹 메모"
         />
 
-        {/* 캐릭터 카드 2열 배치 (실제 tmux 창번호 순서), 1000px 이하에서 1열로 전환 */}
+        {/* 캐릭터 카드 2열 배치 (화면 표시 순서 — 천마신군그룹만 고정 순서, pane 번호는 아래서 별도 계산),
+            1000px 이하에서 1열로 전환 */}
         <div className="cc-card-grid">
           {order.length === 0 && !groupLoading && (
             <div className="cc-panel ty-sub">그룹 정보를 불러오지 못했습니다.</div>
           )}
-          {order.map((name, idx) => (
+          {displayOrder(groupName, order).map((name) => (
             <CharCard
               key={name}
-              windowIndex={idx}
+              windowIndex={order.indexOf(name)}
               session={group?.session ?? ""}
               name={name}
               groupName={groupName}
@@ -670,19 +689,21 @@ function PeriodGrowth({ name, stat30 }: { name: string; stat30: CharStats | unde
  * 최대 능력치 표시 — fav-command-center.tsx 의 MaxStats 와 같은 스타일.
  * 값 자체는 CharCard 가 fetch 해서 넘겨준다 — GoalEta 의 "현재 최대치"
  * 계산에도 같은 값을 써야 해서 여기서 따로 불러오지 않는다(중복 요청 방지).
+ *
+ * 최대 정신력은 mana(교황/마왕) 여부와 무관하게 항상 보여준다(대부/장군도
+ * favstats 값 자체는 있다) — ETA(GoalEta)만 교황·마왕으로 계속 제한한다.
+ * 글씨는 라벨/숫자 다 한 단계 크게(13px, 기본 .cc-stats 12px보다 큼).
  */
-function MaxStatsRow({ stat, mana }: { stat: FavStat; mana: boolean }) {
+function MaxStatsRow({ stat }: { stat: FavStat }) {
   const fmt = (v: number | null) => (v === null ? "-" : v.toLocaleString())
   return (
-    <div className="cc-stats" style={{ marginBottom: 6 }}>
+    <div className="cc-stats" style={{ marginBottom: 6, fontSize: 13 }}>
       <span>
         최대 체력 <b>{fmt(stat.hpMax)}</b>
       </span>
-      {mana && (
-        <span>
-          최대 정신력 <b>{fmt(stat.mpMax)}</b>
-        </span>
-      )}
+      <span>
+        최대 정신력 <b>{fmt(stat.mpMax)}</b>
+      </span>
       <span>
         최대 이동력 <b>{fmt(stat.mvMax)}</b>
       </span>
@@ -757,7 +778,7 @@ function CharCard({
         <>
           {/* 최대 능력치 — 5명(한비광/담화린/최상희/천마신군/진풍백)만 캡처 자반이
               심겨 있다. id 없는 나머지 그룹 캐릭터는 이 줄 자체가 안 보인다. */}
-          {favId && <MaxStatsRow stat={maxStat} mana={mana} />}
+          {favId && <MaxStatsRow stat={maxStat} />}
 
           {/* 4. 누적 성장(기간 증가량) — 최대치와는 다른 값이다. 즐겨찾기
               카드와 같은 cc-stats 스타일로, 위 날짜 범위 동안 실제로
@@ -766,11 +787,9 @@ function CharCard({
             <span>
               체력 <b>+{stat.totals.hp.toLocaleString()}</b>
             </span>
-            {mana && (
-              <span>
-                정신력 <b>+{stat.totals.mp.toLocaleString()}</b>
-              </span>
-            )}
+            <span>
+              정신력 <b>+{stat.totals.mp.toLocaleString()}</b>
+            </span>
             <span>
               이동력 <b>+{stat.totals.mv.toLocaleString()}</b>
             </span>

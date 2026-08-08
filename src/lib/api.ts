@@ -206,35 +206,6 @@ export async function getStatsOthers(
   return request<StatsOthers>(`/api/stats/others${rangeQuery(from, to)}`)
 }
 
-// ---- 운영 참고서 (docs/*.md) ----
-export interface DocMeta {
-  name: string
-  key: string
-  size: number
-  mtime: string
-}
-
-export interface DocContent extends DocMeta {
-  content: string
-}
-
-export async function listDocs(): Promise<DocMeta[]> {
-  const d = await request<{ ok: boolean; docs: DocMeta[] }>("/api/docs")
-  return d.docs ?? []
-}
-
-export async function getDoc(key: string): Promise<DocContent> {
-  return request<DocContent>(`/api/docs/${encodeURIComponent(key)}`)
-}
-
-/** 문서를 덮어쓴다. 서버는 docs/ 안에 이미 있는 문서만 받아준다. */
-export async function saveDoc(key: string, content: string): Promise<DocContent> {
-  return request<DocContent>(`/api/docs/${encodeURIComponent(key)}`, {
-    method: "POST",
-    body: JSON.stringify({ content }),
-  })
-}
-
 // ---- 접속 즐겨찾기 (favorites.json, 서버 저장 — PC 간 공유) ----
 export async function getFavoritesRaw(): Promise<string> {
   const d = await request<{ ok: boolean; content: string }>("/api/favorites")

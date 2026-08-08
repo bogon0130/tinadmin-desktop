@@ -53,8 +53,8 @@ type ViewId =
   | "doc-한비광그룹"
   | "doc-천마신군그룹"
 
-/** 그룹별 참고서 메뉴 id -> 서버 docs/<이름>.md 의 이름 */
-const GROUP_DOCS: Record<string, string> = {
+/** 그룹 대시보드 메뉴 id -> 그룹명 */
+const GROUP_VIEWS: Record<string, string> = {
   "doc-한비광그룹": "한비광그룹",
   "doc-천마신군그룹": "천마신군그룹",
 }
@@ -65,7 +65,7 @@ type MenuItem = { id: ViewId; label: string; icon: typeof BookOpen }
 const MENU: MenuItem[] = [
   // 클릭 한 번으로 저장된 방식대로 접속한다 — 가장 자주 쓰므로 맨 위
   { id: "favorites", label: "즐겨찾기", icon: Star },
-  // 그룹별 운영 참고서
+  // 그룹별 대시보드
   { id: "doc-한비광그룹", label: "한비광그룹", icon: BookOpen },
   { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
   { id: "files", label: "파일 관리", icon: FolderCog },
@@ -270,8 +270,8 @@ export default function App() {
             <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />
           )}
           {view === "guide" && <GuideView />}
-          {GROUP_DOCS[view] && (
-            <GroupView key={view} groupName={GROUP_DOCS[view]} />
+          {GROUP_VIEWS[view] && (
+            <GroupView key={view} groupName={GROUP_VIEWS[view]} />
           )}
         </main>
       </div>
