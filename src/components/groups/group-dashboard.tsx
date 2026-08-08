@@ -219,6 +219,78 @@ function RespawnAllBox({ text }: { text: string }) {
 }
 
 /**
+ * 자반 중지/실행 복사 카드 6개 — #ignore 명령을 클립보드에 복사만 한다.
+ *
+ * ★서버 호출 없음★ RespawnAllBox 처럼 respawnCmd 를 조립하는 게 아니라
+ *   고정 문자열을 그대로 복사만 하므로 group/session 정보가 전혀 필요 없다
+ *   — 그래서 두 그룹(한비광그룹/천마신군그룹) 어디서 렌더해도 항상 같은
+ *   6개가 뜬다. copyText/toast 피드백은 CopyButton과 동일하게 재사용한다.
+ */
+const IGNORE_CARDS: { label: string; cmd: string }[] = [
+  { label: "액션 끄기", cmd: "#ignore actions on" },
+  { label: "액션 켜기", cmd: "#ignore actions off" },
+  { label: "줄임말 끄기", cmd: "#ignore aliases on" },
+  { label: "줄임말 켜기", cmd: "#ignore aliases off" },
+  { label: "틱커 끄기", cmd: "#ignore tickers on" },
+  { label: "틱커 켜기", cmd: "#ignore tickers off" },
+]
+
+function IgnoreCard({ label, cmd }: { label: string; cmd: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <div
+      className="cc-panel"
+      style={{
+        padding: 10,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 8,
+      }}
+    >
+      <span className="ty-sub" style={{ fontSize: 12 }}>
+        {label}
+      </span>
+      <button
+        onClick={async () => {
+          if (await copyText(cmd)) {
+            setDone(true)
+            setTimeout(() => setDone(false), 1200)
+            toast.success("복사됨", { description: cmd })
+          } else {
+            toast.error("복사하지 못했습니다")
+          }
+        }}
+        className="cc-btn"
+        title={cmd}
+      >
+        {done ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+        {done ? "복사됨" : "복사"}
+      </button>
+    </div>
+  )
+}
+
+/** 한방 접속 복사칸 바로 아래에 붙는 작은 섹션 — 큰 카드 대신 6개 소형 카드를 2열로. */
+function IgnoreControlsSection() {
+  return (
+    <div className="cc-panel">
+      <div className="cc-panel-title" style={{ marginBottom: 8 }}>
+        자반 중지/실행
+      </div>
+      <div className="ty-sub" style={{ marginBottom: 10 }}>
+        멈추려는 캐릭터 창 하나에 붙여넣기 (붙여넣은 그 창만 적용됨). 액션·줄임말·틱커를 잠시 멈추거나 다시 켠다.
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
+        {IGNORE_CARDS.map((c) => (
+          <IgnoreCard key={c.label} label={c.label} cmd={c.cmd} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
  * 개인/그룹 메모칸 — 마운트 시 GET, 포커스를 벗어나면(onBlur) POST 로 저장한다.
  * 실패해도 화면이 죽지 않는다(notes-store 의 get/saveNote 는 절대 안 던짐).
  */
@@ -474,6 +546,9 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
 
         {/* 한방 접속 복사칸 — 그룹 헤더 바로 아래 */}
         {group && order.length > 0 && <RespawnAllBox text={groupCopyText} />}
+
+        {/* 자반 중지/실행 복사 카드 6개 — 한방 접속 복사칸 바로 아래, 그룹 무관 고정 */}
+        <IgnoreControlsSection />
 
         {/* 그룹 전체 메모칸 — 카드들 위 최상단 */}
         <NoteBox
