@@ -278,7 +278,11 @@ body, body * {
 .hud-panel {
     border: 1px solid var(--tin-edge);
     border-radius: 12px;
-    background: var(--tin-panel);
+    /* --tin-panel 이 index.css 뒷부분에서 var(--surface)(rgba(255,255,255,0.035),
+       거의 투명)로 재정의되어 팝업 배경이 비쳐 보이던 문제 — 팝업만 원래
+       불투명값(213행 --tin-panel 최초 정의)으로 고정한다. 변수 자체는 다른
+       곳(hover 배경 등)에 계속 쓰이므로 안 건드린다. */
+    background: #0a1410;
     box-shadow: 0 0 26px rgb(var(--tin-accent-rgb) / 0.10),
                 inset 0 1px 0 rgb(var(--tin-accent-rgb) / 0.13);
     position: relative;
