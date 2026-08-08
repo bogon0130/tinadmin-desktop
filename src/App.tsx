@@ -11,6 +11,7 @@ import {
   Play,
   Settings,
   Star,
+  Swords,
   Terminal,
 } from "lucide-react"
 import { Toaster, toast } from "sonner"
@@ -41,6 +42,7 @@ import { ComboView } from "@/components/combo-view"
 import { GroupView } from "@/components/groups/group-view"
 import { GuideView } from "@/components/guide-view"
 import { FavoritesView } from "@/components/favorites-view"
+import { ItemsView } from "@/components/items-view"
 import { applyUiBase } from "@/lib/ui-base"
 
 type ViewId =
@@ -50,6 +52,7 @@ type ViewId =
   | "stats"
   | "files"
   | "combo"
+  | "items"
   | "doc-한비광그룹"
   | "doc-천마신군그룹"
 
@@ -70,6 +73,7 @@ const MENU: MenuItem[] = [
   { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
   { id: "files", label: "파일 관리", icon: FolderCog },
   { id: "combo", label: "접속 빌더", icon: Plug },
+  { id: "items", label: "아이템 도감", icon: Swords },
   { id: "stats", label: "통계", icon: BarChart3 },
   { id: "notes", label: "정보 저장소", icon: BookText },
   { id: "guide", label: "사용법", icon: GraduationCap },
@@ -270,6 +274,7 @@ export default function App() {
             <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />
           )}
           {view === "guide" && <GuideView />}
+          {view === "items" && <ItemsView />}
           {GROUP_VIEWS[view] && (
             <GroupView key={view} groupName={GROUP_VIEWS[view]} />
           )}
