@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { getStatsMe, type CharStats, type LevelEvent } from "@/lib/api"
 import { getGroups, type GroupInfo } from "@/lib/groups"
 import { EMPTY_STAT, getFavStat, type FavStat } from "@/lib/favstats"
+import { getNote, saveNote } from "@/lib/notes-store"
 
 /**
  * 그룹 캐릭터 5명의 stats_fav id.
@@ -23,6 +24,27 @@ const GROUP_STAT_ID: Record<string, string> = {
   최상희: "grp-choesanghui",
   천마신군: "grp-cheonmasingun",
   진풍백: "grp-jinpungbaek",
+}
+
+/**
+ * 캐릭터 메모칸 key — 위 5명은 stat id 를 그대로 재사용(작업서 지시)하고,
+ * 캡처 자반이 없는 나머지 5명도 메모는 필요해서 같은 "grp-" 규칙으로
+ * 새 key 를 만들어 채웠다. tin 파일과는 무관한 순수 저장용 키라 로마자
+ * 표기가 완벽하지 않아도 상관없다 — 화면에 노출되지 않는다.
+ */
+const NOTE_KEY: Record<string, string> = {
+  ...GROUP_STAT_ID,
+  초운현: "grp-chounhyeon",
+  커: "grp-keo",
+  매유진: "grp-maeyujin",
+  벽력자: "grp-byeokryeokja",
+  천운악: "grp-cheonunak",
+}
+
+/** 그룹 전체 메모칸 key — 작업서 예시(grp-hanbigwang-group)를 두 그룹에 일반화했다. */
+const GROUP_SLUG: Record<string, string> = {
+  한비광그룹: "hanbigwang",
+  천마신군그룹: "cheonmasingun",
 }
 
 /**
@@ -142,6 +164,115 @@ function CopyButton({ text, label, full }: { text: string; label: string; full?:
   )
 }
 
+/**
+ * 한방 접속 복사칸 — 읽기전용 textarea + 복사 버튼.
+ * 카드 개별 복사(CopyButton)와 별개 UI다: 저 버튼은 라벨만 바뀌는 단순
+ * 버튼이고, 여긴 전체 명령어를 눈으로 확인할 수 있게 통째로 보여준다.
+ */
+function RespawnAllBox({ text }: { text: string }) {
+  const [done, setDone] = useState(false)
+  return (
+    <div className="cc-panel">
+      <div className="cc-panel-title" style={{ marginBottom: 8 }}>
+        RESPAWN ALL · 한방 접속 복사
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+        <textarea
+          readOnly
+          value={text}
+          rows={3}
+          onFocus={(e) => e.currentTarget.select()}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            resize: "vertical",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            lineHeight: 1.5,
+            padding: 10,
+            borderRadius: 2,
+            border: "1px solid var(--border)",
+            background: "var(--surface-2)",
+            color: "var(--text)",
+          }}
+        />
+        <button
+          onClick={async () => {
+            if (await copyText(text)) {
+              setDone(true)
+              setTimeout(() => setDone(false), 1500)
+              toast.success("그룹 전체 접속 명령 복사됨")
+            } else {
+              toast.error("복사하지 못했습니다")
+            }
+          }}
+          disabled={!text}
+          className="cc-btn"
+          style={{ flexShrink: 0, alignSelf: "center", fontWeight: 700 }}
+        >
+          {done ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+          {done ? "복사됨!" : "복사"}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * 개인/그룹 메모칸 — 마운트 시 GET, 포커스를 벗어나면(onBlur) POST 로 저장한다.
+ * 실패해도 화면이 죽지 않는다(notes-store 의 get/saveNote 는 절대 안 던짐).
+ */
+function NoteBox({ noteKey, placeholder }: { noteKey: string; placeholder: string }) {
+  const [value, setValue] = useState("")
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    let alive = true
+    void getNote(noteKey).then((v) => {
+      if (alive) setValue(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [noteKey])
+
+  async function handleBlur() {
+    setSaving(true)
+    const ok = await saveNote(noteKey, value)
+    setSaving(false)
+    if (!ok) toast.error("메모 저장 실패", { description: noteKey })
+  }
+
+  return (
+    <div style={{ position: "relative" }}>
+      <textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={() => void handleBlur()}
+        placeholder={placeholder}
+        rows={2}
+        style={{
+          width: "100%",
+          resize: "vertical",
+          fontSize: 12,
+          lineHeight: 1.5,
+          padding: 8,
+          borderRadius: 2,
+          border: "1px solid var(--border)",
+          background: "var(--surface-2)",
+          color: "var(--text)",
+        }}
+      />
+      {saving && (
+        <Loader2
+          className="size-3 animate-spin"
+          style={{ position: "absolute", right: 8, top: 8, color: "var(--text-dim)" }}
+        />
+      )}
+    </div>
+  )
+}
+
 function todayStr() {
   return new Date().toISOString().slice(0, 10)
 }
@@ -255,19 +386,9 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
   const liveCount = order.filter((n) => liveByName.get(n)).length
   const allLive = order.length > 0 && liveCount === order.length
 
-  // 그룹 합계 — 통계가 붙은(has_stats) 캐릭터만. 아직 기록 없는 캐릭터(pending)는 0으로 이미 채워져 있다.
+  // 통계가 붙은(has_stats) 캐릭터만 — CharCard 에 hasStats 로 넘긴다.
   const statCharNames = new Set(
     (group?.characters ?? []).filter((c) => c.has_stats).map((c) => c.name),
-  )
-  const trackedChars = chars.filter((c) => statCharNames.has(c.name))
-  const totals = trackedChars.reduce(
-    (acc, c) => ({
-      count: acc.count + c.count,
-      hp: acc.hp + c.totals.hp,
-      mp: acc.mp + c.totals.mp,
-      mv: acc.mv + c.totals.mv,
-    }),
-    { count: 0, hp: 0, mp: 0, mv: 0 },
   )
 
   // 그룹 전체 접속 복사 — order(실제 창번호 순서) 그대로 respawn-pane 을 이어붙인다
@@ -329,58 +450,37 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
                 )}
                 새로고침
               </button>
-              {group && order.length > 0 && (
-                <CopyButton text={groupCopyText} label="그룹 전체 접속 복사" />
-              )}
             </div>
           </div>
         </div>
 
-        {/* 본문: 왼쪽 캐릭터 카드 + 오른쪽 그룹 합계 */}
-        <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.4fr) minmax(0, 1fr)", gap: "var(--gap-sec)" }}>
-          {/* 왼쪽 — 캐릭터 카드 세로 나열 (실제 tmux 창번호 순서) */}
-          <div className="ui-stack-lg">
-            {order.length === 0 && !groupLoading && (
-              <div className="cc-panel ty-sub">그룹 정보를 불러오지 못했습니다.</div>
-            )}
-            {order.map((name, idx) => (
-              <CharCard
-                key={name}
-                windowIndex={idx}
-                session={group?.session ?? ""}
-                name={name}
-                groupName={groupName}
-                live={liveByName.get(name) ?? false}
-                stat={charByName.get(name)}
-                stat30={char30ByName.get(name)}
-                hasStats={statCharNames.has(name)}
-              />
-            ))}
-          </div>
+        {/* 한방 접속 복사칸 — 그룹 헤더 바로 아래 */}
+        {group && order.length > 0 && <RespawnAllBox text={groupCopyText} />}
 
-          {/* 오른쪽 — 그룹 합계 */}
-          <div className="ui-stack-lg">
-            <div className="cc-panel">
-              <span className="cc-panel-title">GROUP TOTALS · 그룹 합계</span>
-              <div className="cc-stats" style={{ marginTop: 12, flexWrap: "wrap" }}>
-                <span>
-                  레벨업 <b>{totals.count}</b>
-                </span>
-                <span>
-                  체력 <b>+{totals.hp.toLocaleString()}</b>
-                </span>
-                <span>
-                  정신력 <b>+{totals.mp.toLocaleString()}</b>
-                </span>
-                <span>
-                  이동력 <b>+{totals.mv.toLocaleString()}</b>
-                </span>
-              </div>
-              <div className="ty-sub" style={{ marginTop: 8 }}>
-                통계 대상 {trackedChars.length}명 · {from} ~ {to}
-              </div>
-            </div>
-          </div>
+        {/* 그룹 전체 메모칸 — 카드들 위 최상단 */}
+        <NoteBox
+          noteKey={GROUP_SLUG[groupName] ? `grp-${GROUP_SLUG[groupName]}-group` : `grp-${groupName}-group`}
+          placeholder="그룹 메모"
+        />
+
+        {/* 캐릭터 카드 세로 나열 (실제 tmux 창번호 순서), 단일 컬럼 */}
+        <div className="ui-stack-lg">
+          {order.length === 0 && !groupLoading && (
+            <div className="cc-panel ty-sub">그룹 정보를 불러오지 못했습니다.</div>
+          )}
+          {order.map((name, idx) => (
+            <CharCard
+              key={name}
+              windowIndex={idx}
+              session={group?.session ?? ""}
+              name={name}
+              groupName={groupName}
+              live={liveByName.get(name) ?? false}
+              stat={charByName.get(name)}
+              stat30={char30ByName.get(name)}
+              hasStats={statCharNames.has(name)}
+            />
+          ))}
         </div>
       </div>
     </div>
@@ -730,6 +830,11 @@ function CharCard({
           label="접속 복사"
           full
         />
+      </div>
+
+      {/* 개인 메모칸 */}
+      <div style={{ marginTop: 8 }}>
+        <NoteBox noteKey={NOTE_KEY[name] ?? `grp-${name}`} placeholder="메모" />
       </div>
     </article>
   )
