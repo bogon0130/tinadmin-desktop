@@ -3,7 +3,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   Copy,
-  Download,
   Star,
   FileCheck2,
   PlugZap,
@@ -16,7 +15,6 @@ import { invoke } from "@tauri-apps/api/core"
 import { toast } from "sonner"
 
 import {
-  comboBat,
   comboConnect,
   comboCreate,
   comboSources,
@@ -54,33 +52,26 @@ const baseOf = (f: string) => {
   return i === -1 ? f : f.slice(i + 1)
 }
 
+// 세션 처리 방식 — 항상 "파일에 세션 있음"으로 고정한다(v0.42).
+// 0단계 조사에서 실제 캐릭터 tin 은 전부 #session 을 갖고 있음을 확인했다
+// (기본.tin/직업별_자반/그룹기본/stats 처럼 #session 이 없는 파일은 전부
+// #read 로 캐릭터 파일에 불려들어가는 지원용 파일이라 문제 없음).
+const SESSION_MODE: SessionMode = "file"
+
 /**
  * 접속 조합 빌더.
  *
- * tin 여러 개를 골라 순서를 정하고 -> 검증 -> 조합 파일 생성 -> 접속.
+ * tin 여러 개를 골라 순서를 정하고 -> 검증 -> 조합 파일 생성 -> 단독 접속.
  * 서버는 조합 파일을 만들 뿐 tmux 로 아무것도 보내지 않는다.
  *
- * 접속은 두 갈래다.
- *   [단독/그룹 접속] 이 PC 가 새 터미널 창을 띄워 ssh 로 붙는다 (Rust open_terminal)
- *   [.bat 다운로드]  파일로 받아 직접 실행 — 예전 방식도 그대로 남겨둔다
+ * [단독 접속] 이 PC 가 새 터미널 창을 띄워 ssh 로 붙는다 (Rust open_terminal).
  */
 export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void }) {
   const [sources, setSources] = useState<string[]>([])
-  const [defaults, setDefaults] = useState({
-    host: "ggai.tv",
-    port: "4000",
-    ssh: "",
-    tmux_session: "goblin",
-  })
   const [picked, setPicked] = useState<string[]>([]) // 순서 = #read 순서
   const [comboName, setComboName] = useState("")
-  const [session, setSession] = useState("")
   const [host, setHost] = useState("ggai.tv")
   const [port, setPort] = useState("4000")
-  const [mode, setMode] = useState<"solo" | "group">("solo")
-  // 세션을 누가 만드느냐. 기본은 "파일에 있는 걸 쓴다" —
-  // 캐릭터 tin 은 대개 자기 #session 을 갖고 있어서, 빌더가 또 만들면 ALREADY 오류가 난다.
-  const [sessionMode, setSessionMode] = useState<SessionMode>("file")
 
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
@@ -88,7 +79,7 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
   const [result, setResult] = useState<ComboValidation | null>(null)
   const [combo, setCombo] = useState<ComboResult | null>(null)
   const [dragIdx, setDragIdx] = useState<number | null>(null)
-  const [connecting, setConnecting] = useState<"solo" | "group" | null>(null)
+  const [connecting, setConnecting] = useState(false)
   const [preview, setPreview] = useState<{ solo: string; group: string } | null>(null)
   // 즐겨찾기 저장 폼
   const [favOpen, setFavOpen] = useState(false)
@@ -104,7 +95,6 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
     try {
       const s = await comboSources()
       setSources(s.files)
-      setDefaults(s.defaults)
       setHost(s.defaults.host)
       setPort(s.defaults.port)
     } catch (e) {
@@ -119,13 +109,6 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
   }, [load])
 
   const groups = useMemo(() => groupByDir(sources), [sources])
-
-  function changeSessionMode(m: SessionMode) {
-    setSessionMode(m)
-    setResult(null)   // 판정 기준이 달라지므로 검증 결과를 버린다
-    setCombo(null)
-    setPreview(null)
-  }
 
   function toggle(f: string) {
     setPicked((p) => (p.includes(f) ? p.filter((x) => x !== f) : [...p, f]))
@@ -155,7 +138,7 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
     }
     setChecking(true)
     try {
-      const v = await comboValidate(picked, sessionMode)
+      const v = await comboValidate(picked, SESSION_MODE)
       setResult(v)
       if (v.level === "success") toast.success("검증 통과")
       else if (v.level === "warning")
@@ -172,12 +155,12 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
     setCreating(true)
     try {
       const c = await comboCreate(
-        comboName.trim(), picked, session.trim(), host, port, sessionMode,
+        comboName.trim(), picked, "", host, port, SESSION_MODE,
       )
       setCombo(c)
       void loadPreview(c)
       toast.success(`✅ 조합 만듦 — ${c.name}`, {
-        description: "⚠️ 게임엔 미반영. 받은 .bat 으로 접속하세요.",
+        description: "⚠️ 게임엔 미반영. 검증 통과 후 단독 접속으로 붙으세요.",
       })
     } catch (e) {
       toast.error("조합 만들기 실패", {
@@ -189,34 +172,34 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
   }
 
   /**
-   * 새 터미널 창을 띄워 조합에 접속한다.
+   * 새 터미널 창을 띄워 조합에 접속한다 (단독 전용).
    *
    * 서버는 명령 재료(접속대상 + 원격명령)만 내려주고 ssh 를 실행하지 않는다.
    * 실행은 이 PC 의 Rust 쪽 open_terminal 이 새 콘솔 창을 띄워서 한다.
    */
-  async function connect(m: "solo" | "group") {
+  async function connect() {
     if (!combo) return
-    setConnecting(m)
+    setConnecting(true)
     try {
-      const info = await comboConnect(combo.combo, combo.session, m)
+      const info = await comboConnect(combo.combo, combo.session, "solo")
       const ran = await invoke<string>("open_terminal", {
         target: info.ssh_target,
         remote: info.remote,
-        title: `${combo.session} ${m === "group" ? "그룹" : "단독"} — tinadmin`,
+        title: `${combo.session} 단독 — tinadmin`,
       })
       console.info("[접속] ", ran)
-      toast.success(`🖥️ 새 터미널 창을 열었습니다 (${m === "group" ? "그룹" : "단독"})`, {
+      toast.success("🖥️ 새 터미널 창을 열었습니다 (단독)", {
         description: info.description,
       })
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       toast.error("접속 실패", {
         description: msg.includes("open_terminal")
-          ? "앱(데스크톱)에서만 접속 버튼을 쓸 수 있습니다. .bat 을 받아 실행해 주세요."
+          ? "앱(데스크톱)에서만 접속 버튼을 쓸 수 있습니다."
           : msg,
       })
     } finally {
-      setConnecting(null)
+      setConnecting(false)
     }
   }
 
@@ -229,7 +212,7 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
       setFavStore(EMPTY_STORE)
     }
     setFavName(combo.combo)
-    setFavMode(mode)
+    setFavMode("solo")
     setFavOpen(true)
   }
 
@@ -258,7 +241,7 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
         session: combo.session,
         host: combo.host ?? host,
         port: combo.port ?? port,
-        sessionMode,
+        sessionMode: SESSION_MODE,
         mode: favMode,
         folder,
         createdAt: new Date().toISOString().slice(0, 10),
@@ -279,18 +262,7 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
     }
   }
 
-  async function copyBat(m: "solo" | "group") {
-    if (!combo) return
-    try {
-      const b = await comboBat(combo.combo, combo.session, m)
-      await navigator.clipboard.writeText(b.content)
-      toast.success(`📋 ${b.filename} 내용을 복사했습니다`)
-    } catch (e) {
-      toast.error("복사 실패", { description: e instanceof Error ? e.message : String(e) })
-    }
-  }
-
-  /** 화면에 보여줄 .bat 명령 미리보기 (생성 직후 두 모드 다 받아둔다) */
+  /** 화면에 보여줄 명령 미리보기 (생성 직후 두 모드 다 받아둔다) */
   const loadPreview = useCallback(async (c: ComboResult) => {
     try {
       const [solo, group] = await Promise.all([
@@ -303,35 +275,13 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
     }
   }, [])
 
-  async function downloadBat(m: "solo" | "group") {
-    if (!combo) return
-    try {
-      const b = await comboBat(combo.combo, combo.session, m)
-      // 브라우저/웹뷰에서 파일로 저장
-      const blob = new Blob([b.content], { type: "application/octet-stream" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = b.filename
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      toast.success(`💾 ${b.filename} 저장됨`, { description: b.description })
-    } catch (e) {
-      toast.error(".bat 만들기 실패", {
-        description: e instanceof Error ? e.message : String(e),
-      })
-    }
-  }
-
-  // "파일에 세션 있음" 이면 세션 이름을 입력받지 않는다 — 검증이 파일에서 찾아준다.
+  // "파일에 세션 있음" 고정이므로 검증이 찾아낸 세션 이름이 있어야 만들 수 있다.
   const canCreate =
     result?.ok === true &&
     comboName.trim() !== "" &&
-    (sessionMode === "file" ? !!result.session_name : session.trim() !== "")
+    !!result.session_name
 
-  // 요구사항 5: 검증을 통과하고 조합이 만들어진 상태에서만 접속할 수 있다
+  // 검증을 통과하고 조합이 만들어진 상태에서만 접속할 수 있다
   const canConnect = !!combo && result?.ok === true
 
   const inputCls =
@@ -420,8 +370,7 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
           }}
         >
           <AlertTriangle className="mr-1.5 inline size-3.5" style={{ color: "#f5a524" }} />
-          조합 파일을 만들 뿐 <b>지금 도는 세션은 건드리지 않습니다.</b> 접속은 아래에서
-          받은 <b>.bat</b> 으로 하세요.
+          조합 파일을 만들 뿐 <b>지금 도는 세션은 건드리지 않습니다.</b>
         </div>
 
         {/* 순서 */}
@@ -475,52 +424,6 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
         {/* 설정 */}
         <p className="hud-sect">SESSION · 접속 설정</p>
 
-        {/* 세션 처리 방식 — 이걸 잘못 고르면 세션이 둘이 되어 ALREADY 오류가 난다 */}
-        <div
-          className="mb-3 rounded-md border p-3"
-          style={{ borderColor: "var(--tin-edge)", background: "var(--tin-panel2)" }}
-        >
-          <p className="mb-2" style={{ fontSize: "var(--tin-fs-sm)", color: "var(--tin-accent)" }}>
-            세션 처리 방식
-          </p>
-          {(
-            [
-              {
-                v: "file" as const,
-                t: "파일에 세션 있음 (기본)",
-                d: "고른 파일 안의 #session 을 그대로 쓴다. 빌더는 #config + #read 만 만든다.",
-              },
-              {
-                v: "builder" as const,
-                t: "빌더가 세션 생성",
-                d: "빌더가 위에 #session {이름} {서버} {포트} 를 넣는다. 파일에 #session 이 없을 때 쓴다.",
-              },
-            ]
-          ).map((o) => (
-            <label
-              key={o.v}
-              className="flex cursor-pointer items-start gap-2 py-1"
-              style={{ fontSize: "var(--tin-fs-sm)" }}
-            >
-              <input
-                type="radio"
-                name="session-mode"
-                checked={sessionMode === o.v}
-                onChange={() => changeSessionMode(o.v)}
-                className="mt-0.5 accent-[var(--tin-accent)]"
-              />
-              <span>
-                <span style={{ color: sessionMode === o.v ? "var(--tin-accent)" : undefined }}>
-                  {o.t}
-                </span>
-                <span className="block" style={{ opacity: 0.65 }}>
-                  {o.d}
-                </span>
-              </span>
-            </label>
-          ))}
-        </div>
-
         <div className="mb-4 grid gap-2 sm:grid-cols-2">
           <label style={{ fontSize: "var(--tin-fs-sm)" }}>
             조합 이름 (파일명)
@@ -533,75 +436,21 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
             />
           </label>
 
-          {sessionMode === "builder" ? (
-            <>
-              <label style={{ fontSize: "var(--tin-fs-sm)" }}>
-                세션 이름
-                <input
-                  value={session}
-                  onChange={(e) => setSession(e.target.value)}
-                  placeholder="담신우"
-                  className={`${inputCls} mt-1 w-full`}
-                  style={inputStyle}
-                />
-              </label>
-              <label style={{ fontSize: "var(--tin-fs-sm)" }}>
-                게임 서버
-                <input
-                  value={host}
-                  onChange={(e) => setHost(e.target.value)}
-                  className={`${inputCls} mt-1 w-full`}
-                  style={inputStyle}
-                />
-              </label>
-              <label style={{ fontSize: "var(--tin-fs-sm)" }}>
-                포트
-                <input
-                  value={port}
-                  onChange={(e) => setPort(e.target.value.replace(/[^\d]/g, ""))}
-                  className={`${inputCls} mt-1 w-full`}
-                  style={inputStyle}
-                />
-              </label>
-            </>
-          ) : (
-            /* 파일이 세션을 갖고 있으므로 입력칸을 숨기고, 검증이 찾아낸 세션을 보여준다 */
-            <div style={{ fontSize: "var(--tin-fs-sm)" }}>
-              세션 (파일에서 가져옴)
-              <div
-                className="tin-mono mt-1 w-full rounded-md border px-3 py-1.5"
-                style={{
-                  borderColor: "var(--tin-edge)",
-                  opacity: result?.session_name ? 1 : 0.55,
-                }}
-              >
-                {result?.session_name
-                  ? `#session {${result.session_name}}  ← ${result.sessions[0]?.file}:${result.sessions[0]?.line}`
-                  : "검증하면 여기에 표시됩니다"}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="mb-4 flex flex-wrap items-center gap-2">
-          <span style={{ fontSize: "var(--tin-fs-sm)" }}>접속 모드</span>
-          {(["solo", "group"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className="rounded-md border px-3 py-1.5"
+          {/* 파일이 세션을 갖고 있으므로(세션 항상 file 고정), 검증이 찾아낸 세션을 보여준다 */}
+          <div style={{ fontSize: "var(--tin-fs-sm)" }}>
+            세션 (파일에서 가져옴)
+            <div
+              className="tin-mono mt-1 w-full rounded-md border px-3 py-1.5"
               style={{
-                fontSize: "var(--tin-fs-sm)",
-                borderColor: mode === m ? "var(--tin-accent)" : "var(--tin-edge)",
-                color: mode === m ? "var(--tin-accent)" : "var(--tin-fg)",
+                borderColor: "var(--tin-edge)",
+                opacity: result?.session_name ? 1 : 0.55,
               }}
             >
-              {m === "solo" ? "단독" : `그룹 (${defaults.tmux_session} 에 새 창)`}
-            </button>
-          ))}
-          <span className="ml-auto tin-mono" style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}>
-            ssh {defaults.ssh}
-          </span>
+              {result?.session_name
+                ? `#session {${result.session_name}}  ← ${result.sessions[0]?.file}:${result.sessions[0]?.line}`
+                : "검증하면 여기에 표시됩니다"}
+            </div>
+          </div>
         </div>
 
         {/* 검증 + 생성 */}
@@ -678,7 +527,7 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
           </div>
         )}
 
-        {/* 생성 결과 + .bat */}
+        {/* 생성 결과 */}
         {combo && (
           <>
             <p className="hud-sect">RESULT · 생성된 조합</p>
@@ -700,89 +549,38 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
               </pre>
             </div>
 
-            {/* 접속 — 새 터미널 창을 띄운다 */}
+            {/* 접속 — 새 터미널 창을 띄운다 (단독 전용) */}
             <p className="hud-sect">CONNECT · 바로 접속</p>
             <div className="mb-3 flex flex-wrap gap-2">
-              {(["solo", "group"] as const).map((m) => (
-                <button
-                  key={m}
-                  onClick={() => void connect(m)}
-                  disabled={!canConnect || connecting !== null}
-                  title={
-                    canConnect
-                      ? undefined
-                      : "검증을 통과한 조합만 접속할 수 있습니다."
-                  }
-                  className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 disabled:opacity-40"
-                  style={{
-                    borderColor: "var(--tin-accent)",
-                    color: "var(--tin-accent)",
-                    fontSize: "var(--tin-fs-sm)",
-                  }}
-                >
-                  {connecting === m ? (
-                    <Loader2 className="size-3.5 animate-spin" />
-                  ) : (
-                    <PlugZap className="size-3.5" />
-                  )}
-                  {m === "solo" ? "단독 접속" : "그룹 접속"}
-                </button>
-              ))}
+              <button
+                onClick={() => void connect()}
+                disabled={!canConnect || connecting}
+                title={
+                  canConnect
+                    ? undefined
+                    : "검증을 통과한 조합만 접속할 수 있습니다."
+                }
+                className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 disabled:opacity-40"
+                style={{
+                  borderColor: "var(--tin-accent)",
+                  color: "var(--tin-accent)",
+                  fontSize: "var(--tin-fs-sm)",
+                }}
+              >
+                {connecting ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  <PlugZap className="size-3.5" />
+                )}
+                단독 접속
+              </button>
               <span
                 className="self-center"
                 style={{ fontSize: "var(--tin-fs-sm)", opacity: 0.7 }}
               >
-                새 터미널 창이 열립니다. 그룹은 {defaults.tmux_session} 에 창만 추가합니다.
+                새 터미널 창이 열립니다.
               </span>
             </div>
-
-            {/* 실행될 명령 — 직접 붙여 쓰고 싶은 사람을 위해 그대로 보여준다 */}
-            {preview && (
-              <div className="mb-3 grid gap-2">
-                {(["solo", "group"] as const).map((m) => (
-                  <div key={m}>
-                    <div
-                      className="mb-1 flex items-center gap-2"
-                      style={{ fontSize: "var(--tin-fs-sm)" }}
-                    >
-                      <span style={{ opacity: 0.7 }}>
-                        {m === "solo" ? "단독" : "그룹"} 명령
-                      </span>
-                      <button
-                        onClick={() => {
-                          void navigator.clipboard.writeText(preview[m])
-                          toast.success("📋 명령을 복사했습니다")
-                        }}
-                        className="flex items-center gap-1 rounded border px-1.5"
-                        style={{ borderColor: "var(--tin-edge)" }}
-                      >
-                        <Copy className="size-3" />
-                        복사
-                      </button>
-                      <button
-                        onClick={() => void copyBat(m)}
-                        className="flex items-center gap-1 rounded border px-1.5"
-                        style={{ borderColor: "var(--tin-edge)" }}
-                      >
-                        <Copy className="size-3" />
-                        .bat 내용 복사
-                      </button>
-                    </div>
-                    <pre
-                      className="tin-mono tin-scroll overflow-x-auto rounded-md border p-2"
-                      style={{
-                        borderColor: "var(--tin-edge)",
-                        background: "var(--tin-panel2)",
-                        whiteSpace: "pre",
-                        fontSize: "var(--tin-fs-sm)",
-                      }}
-                    >
-                      {preview[m]}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* 즐겨찾기 저장 — 검증 통과 + 조합 생성 상태에서만 */}
             <div className="mb-3">
@@ -890,25 +688,45 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
               )}
             </div>
 
-            {/* .bat 파일로도 받을 수 있게 병행 유지 */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={() => void downloadBat("solo")}
-                className="flex items-center gap-1.5 rounded-md border px-3 py-1.5"
-                style={{ borderColor: "var(--tin-edge)", fontSize: "var(--tin-fs-sm)" }}
-              >
-                <Download className="size-3.5" />
-                .bat 다운로드 (단독)
-              </button>
-              <button
-                onClick={() => void downloadBat("group")}
-                className="flex items-center gap-1.5 rounded-md border px-3 py-1.5"
-                style={{ borderColor: "var(--tin-edge)", fontSize: "var(--tin-fs-sm)" }}
-              >
-                <Download className="size-3.5" />
-                .bat 다운로드 (그룹)
-              </button>
-            </div>
+            {/* 실행될 명령 — 직접 붙여 쓰고 싶은 사람을 위해 그대로 보여준다 */}
+            {preview && (
+              <div className="mb-3 grid gap-2">
+                {(["solo", "group"] as const).map((m) => (
+                  <div key={m}>
+                    <div
+                      className="mb-1 flex items-center gap-2"
+                      style={{ fontSize: "var(--tin-fs-sm)" }}
+                    >
+                      <span style={{ opacity: 0.7 }}>
+                        {m === "solo" ? "단독" : "그룹"} 명령
+                      </span>
+                      <button
+                        onClick={() => {
+                          void navigator.clipboard.writeText(preview[m])
+                          toast.success("📋 명령을 복사했습니다")
+                        }}
+                        className="flex items-center gap-1 rounded border px-1.5"
+                        style={{ borderColor: "var(--tin-edge)" }}
+                      >
+                        <Copy className="size-3" />
+                        복사
+                      </button>
+                    </div>
+                    <pre
+                      className="tin-mono tin-scroll overflow-x-auto rounded-md border p-2"
+                      style={{
+                        borderColor: "var(--tin-edge)",
+                        background: "var(--tin-panel2)",
+                        whiteSpace: "pre",
+                        fontSize: "var(--tin-fs-sm)",
+                      }}
+                    >
+                      {preview[m]}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
