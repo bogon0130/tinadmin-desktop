@@ -100,25 +100,6 @@ export async function saveFile(
   })
 }
 
-export interface StopAllResult {
-  ok: boolean
-  results: { class: string; ok: boolean; msg: string }[]
-  warning?: string
-}
-
-export async function stopAll(): Promise<StopAllResult> {
-  return request<StopAllResult>("/api/stop-all", { method: "POST" })
-}
-
-export interface ResumeResult {
-  ok: boolean
-  results: { file: string; ok: boolean; msg: string }[]
-}
-
-export async function resume(): Promise<ResumeResult> {
-  return request<ResumeResult>("/api/resume", { method: "POST" })
-}
-
 export async function getNotes(): Promise<string> {
   const data = await request<{ ok: boolean; content: string }>("/api/notes")
   return data.content ?? ""

@@ -7,8 +7,6 @@ import {
   GraduationCap,
   Plug,
   LogOut,
-  OctagonX,
-  Play,
   Settings,
   Star,
   Swords,
@@ -20,9 +18,7 @@ import {
   clearToken,
   getApiUrl,
   getToken,
-  resume,
   setApiUrl,
-  stopAll,
 } from "@/lib/api"
 import {
   ACCENT_PRESETS,
@@ -96,36 +92,6 @@ export default function App() {
     // 확정된 색/폰트로 덮어쓴다 (옛 설정이 localStorage 에 남아 있어도)
     applyUiBase()
   }, [])
-
-  async function handleStopAll() {
-    if (
-      !confirm("정말 전체 중지할까요?\n등록된 클래스의 자반이 모두 제거됩니다.")
-    )
-      return
-    try {
-      const res = await stopAll()
-      if (res.warning) {
-        toast.warning("중지할 클래스가 없습니다", { description: res.warning })
-      } else {
-        toast.success("전체 중지 명령 전송됨", {
-          description: res.results.map((r) => r.class).join(", "),
-        })
-      }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
-    }
-  }
-
-  async function handleResume() {
-    try {
-      const res = await resume()
-      toast.success("되살리기 완료", {
-        description: res.results.map((r) => r.file).join(", "),
-      })
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : String(e))
-    }
-  }
 
   function handleLogout() {
     clearToken()
@@ -242,23 +208,6 @@ export default function App() {
           <h2 className="text-sm font-semibold">
             {MENU.find((m) => m.id === view)?.label}
           </h2>
-
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={handleStopAll}
-              className="flex items-center gap-1.5 rounded-md bg-destructive px-3 py-1.5 text-xs font-semibold text-white transition hover:brightness-110"
-            >
-              <OctagonX className="size-3.5" />
-              전체중지
-            </button>
-            <button
-              onClick={handleResume}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium transition hover:bg-secondary"
-            >
-              <Play className="size-3.5" />
-              되살리기
-            </button>
-          </div>
         </header>
 
         {/* 콘텐츠 — 항상 한 칸이다.
