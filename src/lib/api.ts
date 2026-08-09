@@ -76,30 +76,6 @@ export async function login(password: string): Promise<void> {
   setToken(data.token)
 }
 
-export async function loadFile(filename: string): Promise<TinEntry[]> {
-  const data = await request<{ ok: boolean; entries: TinEntry[] }>(
-    `/api/load/${encodeURIComponent(filename)}`,
-  )
-  return data.entries
-}
-
-export interface SaveResult {
-  ok: boolean
-  backup: string | null
-  tmux_ok: boolean
-  tmux_msg: string
-}
-
-export async function saveFile(
-  filename: string,
-  entries: TinEntry[],
-): Promise<SaveResult> {
-  return request<SaveResult>(`/api/save/${encodeURIComponent(filename)}`, {
-    method: "POST",
-    body: JSON.stringify({ entries }),
-  })
-}
-
 export async function getNotes(): Promise<string> {
   const data = await request<{ ok: boolean; content: string }>("/api/notes")
   return data.content ?? ""
@@ -214,7 +190,7 @@ export interface TinFileMeta {
   mtime: string
   mtime_raw: number
   has_plain_secret: boolean
-  /** 표 편집기(/api/load,/api/save)가 다룰 수 있는 파일인지 (서버 ALLOWED_FILES) */
+  /** 옛 표 편집기용 플래그. 그 라우트가 서버 v0.44 에서 사라져 항상 false 다(미사용). */
   table_editable: boolean
   /** 읽기만 되고 저장/이름변경/삭제는 막히는 파일 (main.tin — 부팅 진입점) */
   read_only: boolean
