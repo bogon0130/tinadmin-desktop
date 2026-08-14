@@ -77,20 +77,34 @@ pub fn ps_quote(s: &str) -> String {
 /// start       : 새 창을 띄운다. 첫 따옴표 토큰을 창 제목으로 먹으므로 반드시 준다.
 /// powershell  : 요구대로 새 PowerShell 창에서 실행한다.
 /// -NoExit     : ssh 가 끝나도 창을 닫지 않는다 — 접속이 실패해도 이유를 볼 수 있다.
+///               keep_open=false 면 이 옵션을 빼서 명령이 끝나는 즉시 창이 닫힌다.
 /// chcp 65001  : 한글이 깨지지 않게 UTF-8 코드페이지로 맞춘다.
+///
+/// ★keep_open 을 언제 끄는가★
+///   "끊기(kill-session)" 처럼 결과를 볼 필요가 없고 순식간에 끝나는 명령이다.
+///   접속처럼 실패할 수 있는 명령은 반드시 켜둔다 — 끄면 실패 메시지가 창과 함께
+///   사라져서 왜 안 됐는지 알 방법이 없어진다.
 ///
 /// ★따옴표 설계★
 ///   바깥(cmd)은 겹따옴표, 안쪽(PowerShell)은 홑따옴표만 쓴다.
 ///   원격 명령에는 겹따옴표가 못 들어오게 막아두었고(check_remote),
 ///   원래 들어있는 홑따옴표는 ps_quote 로 '' 로 바꾼다. 두 층이 겹치지 않는다.
-pub fn build_windows_cmdline(target: &str, remote: &str, title: &str) -> Result<String, String> {
+pub fn build_windows_cmdline(
+    target: &str,
+    remote: &str,
+    title: &str,
+    keep_open: bool,
+) -> Result<String, String> {
     if !valid_target(target) {
         return Err(format!("접속 대상 형식이 올바르지 않습니다: {}", target));
     }
     check_remote(remote)?;
+    // 붙일 때 공백까지 함께 넣는다 — 빼면 "powershell-Command" 로 붙어버린다.
+    let noexit = if keep_open { "-NoExit " } else { "" };
     Ok(format!(
-        "/c start \"{}\" powershell -NoExit -Command \"chcp 65001 > $null; ssh -t {} '{}'\"",
+        "/c start \"{}\" powershell {}-Command \"chcp 65001 > $null; ssh -t {} '{}'\"",
         safe_title(title),
+        noexit,
         target,
         ps_quote(remote)
     ))
@@ -111,12 +125,26 @@ pub fn build_unix_argv(target: &str, remote: &str) -> Result<Vec<String>, String
 }
 
 /// 새 터미널 창을 띄워 접속한다. 성공하면 실제로 실행한 명령을 돌려준다.
-#[tauri::command]
-pub fn open_terminal(target: String, remote: String, title: String) -> Result<String, String> {
+///
+/// keep_open : 명령이 끝난 뒤 창을 남길지. 기존 호출부(즐겨찾기·접속 빌더)는 true 를
+///             넘겨 예전과 똑같이 동작한다. false 는 "끊기" 처럼 결과를 볼 필요가
+///             없는 명령에만 쓴다.
+///
+/// ★rename_all = "snake_case" 를 준 이유★ Tauri 는 기본적으로 러스트의 snake_case
+///   인자를 자바스크립트에서 camelCase(keepOpen)로 받는다. 이 프로젝트의 다른 인자는
+///   전부 한 단어(target/remote/title)라 지금까지 차이가 드러나지 않았는데, keep_open
+///   부터는 이름이 갈린다. 양쪽 표기를 맞춰 헷갈릴 여지를 없앤다.
+#[tauri::command(rename_all = "snake_case")]
+pub fn open_terminal(
+    target: String,
+    remote: String,
+    title: String,
+    keep_open: bool,
+) -> Result<String, String> {
     #[cfg(target_os = "windows")]
     {
         use std::os::windows::process::CommandExt;
-        let line = build_windows_cmdline(&target, &remote, &title)?;
+        let line = build_windows_cmdline(&target, &remote, &title, keep_open)?;
         // raw_arg — 러스트 기본 인자 이스케이프와 cmd.exe 파싱 규칙이 달라서,
         // 명령줄을 우리가 만든 그대로 넘겨야 따옴표가 어긋나지 않는다.
         Command::new("cmd.exe")
@@ -131,15 +159,27 @@ pub fn open_terminal(target: String, remote: String, title: String) -> Result<St
     {
         let argv = build_unix_argv(&target, &remote)?;
         // 흔한 터미널을 순서대로 시도한다 (없으면 다음 것).
-        let terms: [(&str, Vec<String>); 4] = [
-            ("x-terminal-emulator", vec!["-e".into()]),
-            ("gnome-terminal", vec!["--".into()]),
-            ("konsole", vec!["-e".into()]),
-            ("xterm", vec!["-e".into()]),
+        //
+        // ★유닉스는 기본이 "명령 끝나면 창 닫힘" 이라 윈도우와 반대다★
+        //   그래서 keep_open=false 는 아무것도 안 해도 되고, keep_open=true 일 때
+        //   창을 붙잡는 옵션을 앞에 끼운다. 세 번째 칸이 그 옵션인데, 그 옵션을
+        //   가진 터미널만 값이 있다 — gnome-terminal 은 --hold 를 없앴고
+        //   x-terminal-emulator 는 무엇으로 연결됐는지에 따라 달라서 못 준다.
+        //   (이 경로는 개발 중 확인용이라 그 두 개에서 창이 닫혀도 문제되지 않는다)
+        let terms: [(&str, Vec<String>, Option<&str>); 4] = [
+            ("x-terminal-emulator", vec!["-e".into()], None),
+            ("gnome-terminal", vec!["--".into()], None),
+            ("konsole", vec!["-e".into()], Some("--hold")),
+            ("xterm", vec!["-e".into()], Some("-hold")),
         ];
         let _ = &title;
-        for (prog, pre) in terms.iter() {
+        for (prog, pre, hold) in terms.iter() {
             let mut c = Command::new(prog);
+            if keep_open {
+                if let Some(h) = hold {
+                    c.arg(h);
+                }
+            }
             c.args(pre).args(&argv);
             match c.spawn() {
                 Ok(_) => {
@@ -164,7 +204,7 @@ mod tests {
 
     #[test]
     fn 단독_명령줄_조립() {
-        let line = build_windows_cmdline(T, SOLO, "담신우 단독").unwrap();
+        let line = build_windows_cmdline(T, SOLO, "담신우 단독", true).unwrap();
         assert_eq!(
             line,
             "/c start \"담신우 단독\" powershell -NoExit -Command \
@@ -175,7 +215,7 @@ mod tests {
 
     #[test]
     fn 그룹_명령줄_조립() {
-        let line = build_windows_cmdline(T, GROUP, "담신우 그룹").unwrap();
+        let line = build_windows_cmdline(T, GROUP, "담신우 그룹", true).unwrap();
         // 겹따옴표는 제목 2개 + -Command 인자 2개 = 정확히 4개.
         assert_eq!(line.matches('"').count(), 4, "따옴표 개수: {}", line);
         // 원격 명령 안의 홑따옴표는 PowerShell 규칙대로 두 개로 늘어나야 한다.
@@ -208,7 +248,7 @@ mod tests {
 
     #[test]
     fn 그룹은_기존창을_건드리지_않는다() {
-        let line = build_windows_cmdline(T, GROUP, "x").unwrap();
+        let line = build_windows_cmdline(T, GROUP, "x", true).unwrap();
         assert!(line.contains("tmux new-window"));
         for 금지 in ["kill-window", "kill-session", "kill-server", "respawn", "send-keys"] {
             assert!(!line.contains(금지), "위험한 명령 발견: {}", 금지);
@@ -218,25 +258,25 @@ mod tests {
     #[test]
     fn 겹따옴표_주입_차단() {
         let evil = "cd /tmp\" && rm -rf / && echo \"";
-        assert!(build_windows_cmdline(T, evil, "x").is_err());
+        assert!(build_windows_cmdline(T, evil, "x", true).is_err());
     }
 
     #[test]
     fn 개행_주입_차단() {
-        assert!(build_windows_cmdline(T, "echo a\nshutdown /s", "x").is_err());
-        assert!(build_windows_cmdline(T, "echo a\r\nshutdown /s", "x").is_err());
+        assert!(build_windows_cmdline(T, "echo a\nshutdown /s", "x", true).is_err());
+        assert!(build_windows_cmdline(T, "echo a\r\nshutdown /s", "x", true).is_err());
     }
 
     #[test]
     fn 제목이_명령줄을_못깨뜨린다() {
-        let line = build_windows_cmdline(T, SOLO, "나쁜\" & calc & \"제목").unwrap();
+        let line = build_windows_cmdline(T, SOLO, "나쁜\" & calc & \"제목", true).unwrap();
         assert!(!line.contains("calc\""));
         assert_eq!(line.matches('"').count(), 4);
     }
 
     #[test]
     fn 빈제목은_기본값() {
-        let line = build_windows_cmdline(T, SOLO, "   ").unwrap();
+        let line = build_windows_cmdline(T, SOLO, "   ", true).unwrap();
         assert!(line.starts_with("/c start \"tinadmin\""));
     }
 
@@ -250,21 +290,21 @@ mod tests {
             "kim bogon@host",
             "kimbogon@host\"",
         ] {
-            assert!(build_windows_cmdline(bad, SOLO, "x").is_err(), "막혔어야 함: {}", bad);
+            assert!(build_windows_cmdline(bad, SOLO, "x", true).is_err(), "막혔어야 함: {}", bad);
         }
     }
 
     #[test]
     fn 정상_접속대상_통과() {
         for good in ["kimbogon@192.168.219.157", "user_1@my-host.example.com", "a@b"] {
-            assert!(build_windows_cmdline(good, SOLO, "x").is_ok(), "통과해야 함: {}", good);
+            assert!(build_windows_cmdline(good, SOLO, "x", true).is_ok(), "통과해야 함: {}", good);
         }
     }
 
     #[test]
     fn 빈명령_거부() {
-        assert!(build_windows_cmdline(T, "", "x").is_err());
-        assert!(build_windows_cmdline(T, "   ", "x").is_err());
+        assert!(build_windows_cmdline(T, "", "x", true).is_err());
+        assert!(build_windows_cmdline(T, "   ", "x", true).is_err());
     }
 
     #[test]

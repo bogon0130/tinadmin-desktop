@@ -61,9 +61,18 @@ function startScriptOf(session: string): string {
  *   6개 그룹이 "누르면 재시작" 으로 똑같이 동작한다.
  *   2>/dev/null 은 세션이 없을 때 나오는 에러를 삼키기 위한 것이고, 세미콜론이라
  *   kill 이 실패해도 스크립트는 그대로 실행된다.
+ *
+ * ★마지막에 attach 를 이어붙인다★ 스크립트는 세션을 백그라운드(-d)로 띄우고 끝나서,
+ *   예전에는 그 자리에 빈 PowerShell 창만 덩그러니 남았다. attach 를 붙이면 같은
+ *   창이 그대로 tmux 화면으로 바뀌어 "접속하면 바로 보인다".
+ *   세미콜론은 check_remote 가 막지 않는다(겹따옴표·제어문자만 차단).
  */
 function connectCmd(session: string): string {
-  return `tmux kill-session -t ${session} 2>/dev/null; bash ~/projects/goblin/${startScriptOf(session)}`
+  return (
+    `tmux kill-session -t ${session} 2>/dev/null; ` +
+    `bash ~/projects/goblin/${startScriptOf(session)}; ` +
+    `tmux attach -t ${session}`
+  )
 }
 
 /** 그룹 순서 — 리더 그룹 2개를 먼저, 직업 그룹 4개를 뒤에 */
@@ -169,6 +178,7 @@ function RunButton({
   remote,
   needConfirm,
   confirmText,
+  keepOpen = true,
 }: {
   label: string
   icon: React.ReactNode
@@ -177,6 +187,8 @@ function RunButton({
   remote: string
   needConfirm?: boolean
   confirmText?: string
+  /** 명령이 끝난 뒤 터미널 창을 남길지. 기본은 남긴다(실패 이유를 봐야 하므로). */
+  keepOpen?: boolean
 }) {
   const [busy, setBusy] = useState(false)
 
@@ -192,6 +204,7 @@ function RunButton({
             target,
             remote,
             title: `${group} ${label} — tinadmin`,
+            keep_open: keepOpen,
           })
           console.info("[main] 실행:", ran)
           toast.success(`🖥️ ${group} · ${label}`, { description: remote })
@@ -268,6 +281,8 @@ function GroupCard({
           remote={`tmux kill-session -t ${s}`}
           needConfirm
           confirmText={killConfirm}
+          // 순식간에 끝나고 볼 결과도 없으므로 창을 남기지 않는다.
+          keepOpen={false}
         />
         <RunButton
           label="뷰(내부)"

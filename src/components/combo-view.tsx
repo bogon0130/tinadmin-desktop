@@ -186,6 +186,8 @@ export function ComboView({ onFavoriteSaved }: { onFavoriteSaved?: () => void })
         target: info.ssh_target,
         remote: info.remote,
         title: `${combo.session} 단독 — tinadmin`,
+        // 접속은 실패할 수 있으므로 창을 남긴다(예전과 같은 동작).
+        keep_open: true,
       })
       console.info("[접속] ", ran)
       toast.success("🖥️ 새 터미널 창을 열었습니다 (단독)", {

@@ -63,6 +63,8 @@ export async function runConnect(f: Favorite) {
     target: info.ssh_target,
     remote: info.remote,
     title: `${f.name} ${modeLabel(f)} — tinadmin`,
+    // 접속은 실패할 수 있으므로 창을 남긴다(예전과 같은 동작).
+    keep_open: true,
   })
   return info
 }
