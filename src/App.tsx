@@ -119,10 +119,10 @@ export default function App() {
             <Terminal className="size-4" />
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold">tinadmin</div>
+            <div className="truncate text-sm font-semibold">KIM BO GON</div>
             <div className="flex min-w-0 items-center gap-1.5">
               <span className="truncate text-[10px] text-muted-foreground">
-                tt++ 자반 관리자
+                tt++ 고블린 자반 프로그램
               </span>
               {/* 버전은 package.json 에서 빌드 시점에 박힌다 (vite define) */}
               <span
