@@ -5,6 +5,7 @@ import {
   BookText,
   FolderCog,
   GraduationCap,
+  House,
   Plug,
   LogOut,
   Settings,
@@ -39,9 +40,11 @@ import { GroupView } from "@/components/groups/group-view"
 import { GuideView } from "@/components/guide-view"
 import { FavoritesView } from "@/components/favorites-view"
 import { ItemsView } from "@/components/items-view"
+import { MainView } from "@/components/main-view"
 import { applyUiBase } from "@/lib/ui-base"
 
 type ViewId =
+  | "main"
   | "favorites"
   | "guide"
   | "notes"
@@ -62,6 +65,8 @@ type MenuItem = { id: ViewId; label: string; icon: typeof BookOpen }
 
 /** 왼쪽 메뉴 — 전부 항상 펼쳐져 있다 */
 const MENU: MenuItem[] = [
+  // 앱을 켜면 처음 보이는 화면 — 공용 명령어와 그룹 상태를 모아둔다
+  { id: "main", label: "메인페이지", icon: House },
   // 클릭 한 번으로 저장된 방식대로 접속한다 — 가장 자주 쓰므로 맨 위
   { id: "favorites", label: "즐겨찾기", icon: Star },
   // 그룹별 대시보드
@@ -77,7 +82,10 @@ const MENU: MenuItem[] = [
 
 export default function App() {
   const [authed, setAuthed] = useState(() => Boolean(getToken()))
-  const [view, setView] = useState<ViewId>("favorites")
+  const [view, setView] = useState<ViewId>("main")
+  // 메인페이지에서 [보기] 를 누르면 그 tin 을 파일관리에서 바로 연다.
+  // ★"tin/" 을 뗀 경로다★ /api/files 는 tin 폴더 기준 상대경로를 쓴다(넘기는 쪽에서 처리).
+  const [openFile, setOpenFile] = useState<string | null>(null)
   // 접속 빌더에서 즐겨찾기를 저장하면 이 값을 올려 목록을 다시 읽게 한다
   const [favReload, setFavReload] = useState(0)
   // 왼쪽 사이드바 폭 — 경계를 끌어 조절하고 재시작해도 유지된다.
@@ -215,10 +223,18 @@ export default function App() {
             이 한 칸 안에서 완결되어야 하고, 필요한 보조 정보는 뷰 내부에서
             카드로 쌓는다. */}
         <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {view === "main" && (
+            <MainView
+              onOpenFile={(name) => {
+                setOpenFile(name)
+                setView("files")
+              }}
+            />
+          )}
           {view === "favorites" && <FavoritesView reloadKey={favReload} />}
           {view === "notes" && <NotesView />}
           {view === "stats" && <StatsView />}
-          {view === "files" && <FilesView />}
+          {view === "files" && <FilesView openFile={openFile} />}
           {view === "combo" && (
             <ComboView onFavoriteSaved={() => setFavReload((n) => n + 1)} />
           )}

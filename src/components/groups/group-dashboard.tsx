@@ -167,14 +167,18 @@ function CopyButton({ text, label, full }: { text: string; label: string; full?:
 /**
  * 한방 접속 복사칸 — 읽기전용 textarea + 복사 버튼.
  * 카드 개별 복사(CopyButton)와 별개 UI다: 저 버튼은 라벨만 바뀌는 단순
- * 버튼이고, 여긴 전체 명령어를 눈으로 확인할 수 있게 통째로 보여준다.
+ * 버튼이고, 여긴 실행할 명령을 눈으로 확인할 수 있게 통째로 보여준다.
+ *
+ * ★이 명령은 그룹을 통째로 재시작한다★ 시작 스크립트를 부르는 한 줄이라,
+ *   붙여넣어 실행하면 그 세션이 끊겼다가 스크립트에 적힌 구성으로 다시 뜬다.
+ *   카드 개별 "완전재접"(그 캐릭터 한 명만 되살림)과는 영향 범위가 다르다.
  */
 function RespawnAllBox({ text }: { text: string }) {
   const [done, setDone] = useState(false)
   return (
     <div className="cc-panel">
       <div className="cc-panel-title" style={{ marginBottom: 8 }}>
-        RESPAWN ALL · 한방 접속 복사
+        한방 접속 (전체 재시작)
       </div>
       <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
         <textarea
@@ -201,7 +205,7 @@ function RespawnAllBox({ text }: { text: string }) {
             if (await copyText(text)) {
               setDone(true)
               setTimeout(() => setDone(false), 1500)
-              toast.success("그룹 전체 접속 명령 복사됨")
+              toast.success("그룹 전체 재시작 명령 복사됨")
             } else {
               toast.error("복사하지 못했습니다")
             }
@@ -221,7 +225,7 @@ function RespawnAllBox({ text }: { text: string }) {
 /**
  * 자반 중지/실행 복사 카드 6개 — #ignore 명령을 클립보드에 복사만 한다.
  *
- * ★서버 호출 없음★ RespawnAllBox 처럼 respawnCmd 를 조립하는 게 아니라
+ * ★서버 호출 없음★ RespawnAllBox 처럼 세션·그룹으로 명령을 조립하는 게 아니라
  *   고정 문자열을 그대로 복사만 하므로 group/session 정보가 전혀 필요 없다
  *   — 그래서 두 그룹(한비광그룹/천마신군그룹) 어디서 렌더해도 항상 같은
  *   6개가 뜬다. copyText/toast 피드백은 CopyButton과 동일하게 재사용한다.
@@ -482,10 +486,18 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
     (group?.characters ?? []).filter((c) => c.has_stats).map((c) => c.name),
   )
 
-  // 그룹 전체 접속 복사 — order(실제 창번호 순서) 그대로 respawn-pane 을 이어붙인다
-  const groupCopyText = group
-    ? order.map((name, idx) => respawnCmd(group.session, groupName, name, idx)).join("; ")
-    : ""
+  // 그룹 전체 접속 복사 — 시작 스크립트 한 줄을 그대로 준다.
+  //
+  // ★예전에는 respawn-pane 을 창 수만큼 이어붙였다★ 그 방식은 이미 떠 있는 세션의
+  //   각 창을 하나씩 되살리는 것이라, 창 구성이 스크립트와 어긋나 있으면(창이 빠졌거나
+  //   이름이 다르면) 그 창만 조용히 안 살아났다. 시작 스크립트를 부르면 세션 구성이
+  //   스크립트 한 곳에서만 정의되므로 화면과 실제가 어긋날 여지가 없다.
+  //
+  // ★파일명이 세션명과 다른 예외가 하나 있다★ goblin 세션은 start_goblin.sh 가 아니라
+  //   start_tmux.sh 가 만든다(실측 2026-08-14). 나머지 5개는 start_{세션명}.sh 규칙.
+  const startScript =
+    group?.session === "goblin" ? "start_tmux.sh" : `start_${group?.session}.sh`
+  const groupCopyText = group ? `bash ~/projects/goblin/${startScript}` : ""
 
   return (
     <div className="tin-scroll min-h-0 flex-1 overflow-y-auto" style={{ padding: "var(--gap-sec)" }}>
