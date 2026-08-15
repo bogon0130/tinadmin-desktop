@@ -7,6 +7,7 @@ import {
   GraduationCap,
   House,
   Plug,
+  Users,
   LogOut,
   Settings,
   Star,
@@ -41,6 +42,7 @@ import { GuideView } from "@/components/guide-view"
 import { FavoritesView } from "@/components/favorites-view"
 import { ItemsView } from "@/components/items-view"
 import { MainView } from "@/components/main-view"
+import { JjolView } from "@/components/jjol-view"
 import { applyUiBase } from "@/lib/ui-base"
 
 type ViewId =
@@ -54,25 +56,18 @@ type ViewId =
   | "items"
   | "doc-한비광그룹"
   | "doc-천마신군그룹"
-  | "doc-졸일"
-  | "doc-졸이"
-  | "doc-졸삼"
-  | "doc-졸사"
-  | "doc-졸오"
-  | "doc-졸육"
+  | "jjol"
 
 /** 그룹 대시보드 메뉴 id -> 그룹명 */
 const GROUP_VIEWS: Record<string, string> = {
   "doc-한비광그룹": "한비광그룹",
   "doc-천마신군그룹": "천마신군그룹",
-  // 쫄 6캐릭 — config.GROUPS 에 캐릭터 이름 그대로 등록돼 있다(그룹당 1명).
-  "doc-졸일": "졸일",
-  "doc-졸이": "졸이",
-  "doc-졸삼": "졸삼",
-  "doc-졸사": "졸사",
-  "doc-졸오": "졸오",
-  "doc-졸육": "졸육",
 }
+// ★쫄그룹("jjol")은 여기 넣지 않는다★ GROUP_VIEWS 는 /api/groups 로 세션 하나의
+//   창 상태를 그리는 GroupDashboard 로 이어지는데, 쫄은 캐릭터마다 세션이 따로라
+//   그 모양이 맞지 않는다. 게다가 config.GROUPS 에 "쫄그룹" 이라는 항목 자체가 없고
+//   졸일~졸육 6개가 각각 등록돼 있어서 그릴 그룹을 못 찾는다.
+//   그래서 아래 본문에서 JjolView 를 따로 렌더한다.
 
 type MenuItem = { id: ViewId; label: string; icon: typeof BookOpen }
 
@@ -85,14 +80,9 @@ const MENU: MenuItem[] = [
   // 그룹별 대시보드
   { id: "doc-한비광그룹", label: "한비광그룹", icon: BookOpen },
   { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
-  // 쫄 6캐릭 — 메뉴는 평면 구조라 중첩이 안 된다(MENU.map 한 번으로 그린다).
-  // 천마신군그룹 아래에 딸린 것처럼 보이게 라벨 앞에 └ 를 붙여 흉내만 낸다.
-  { id: "doc-졸일", label: "└ 졸일", icon: BookOpen },
-  { id: "doc-졸이", label: "└ 졸이", icon: BookOpen },
-  { id: "doc-졸삼", label: "└ 졸삼", icon: BookOpen },
-  { id: "doc-졸사", label: "└ 졸사", icon: BookOpen },
-  { id: "doc-졸오", label: "└ 졸오", icon: BookOpen },
-  { id: "doc-졸육", label: "└ 졸육", icon: BookOpen },
+  // 쫄 6캐릭은 항목 하나로 묶는다 — 클릭하면 전용 화면에 카드 6장이 뜬다.
+  // (처음엔 "└ 졸일"~"└ 졸육" 6줄로 늘어놨는데 메뉴가 밀려서 2026-08-15 통합)
+  { id: "jjol", label: "쫄그룹", icon: Users },
   { id: "files", label: "파일 관리", icon: FolderCog },
   { id: "combo", label: "접속 빌더", icon: Plug },
   { id: "items", label: "아이템 도감", icon: Swords },
@@ -261,6 +251,14 @@ export default function App() {
           )}
           {view === "guide" && <GuideView />}
           {view === "items" && <ItemsView />}
+          {view === "jjol" && (
+            <JjolView
+              onOpenFile={(name) => {
+                setOpenFile(name)
+                setView("files")
+              }}
+            />
+          )}
           {GROUP_VIEWS[view] && (
             <GroupView key={view} groupName={GROUP_VIEWS[view]} />
           )}
