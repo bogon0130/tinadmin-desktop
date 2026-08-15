@@ -45,6 +45,12 @@ type GroupDef = {
   files: TinFile[]
   /** 세션명에서 유추되는 이름과 다른 경우에만 적는다(startScriptOf 참고). */
   startScript?: string
+  /**
+   * 세션 안에 캐릭터가 한 명뿐인가(쫄 6개가 여기 해당).
+   * 확인창 문구를 "그 그룹 전원" / "이 캐릭터만" 으로 가르는 데만 쓴다.
+   * 파일 줄 수 같은 걸로 추론하면 나중에 줄이 늘 때 조용히 틀어지므로 명시한다.
+   */
+  solo?: boolean
 }
 
 /**
@@ -146,42 +152,50 @@ const GROUPS: GroupDef[] = [
   // 다른 그룹과 달리 캐릭터 하나가 곧 그룹이고 세션도 각자다(jjol1~jjol6).
   // tin 도 조합 없이 하나뿐이라 파일 줄이 한 개다.
   //
-  // ★start_jjol.sh 는 6개를 통째로 만든다★ 그래서 한 카드의 [접속] 을 눌러도
-  //   쫄 6명 전부가 끊겼다 다시 뜬다. 아래 GroupCard 의 확인창이 그 사실을 적어준다.
+  // ★시작 스크립트도 캐릭터마다 따로다(start_jjol1~6.sh)★ 처음엔 start_jjol.sh
+  //   하나가 6개를 통째로 만들어서 한 카드를 눌러도 6명이 전부 재시작됐다.
+  //   순환이 캐릭터별로 도는데 한 명 때문에 여섯을 흔드는 게 맞지 않아 쪼갰다.
+  //   이제 각 카드의 [접속] 은 자기 세션 하나만 끊고 다시 띄운다.
   {
     name: "졸일",
     session: "jjol1",
-    startScript: "start_jjol.sh",
+    startScript: "start_jjol1.sh",
+    solo: true,
     files: [{ label: "졸일", path: "tin/쫄그룹/졸일.tin" }],
   },
   {
     name: "졸이",
     session: "jjol2",
-    startScript: "start_jjol.sh",
+    startScript: "start_jjol2.sh",
+    solo: true,
     files: [{ label: "졸이", path: "tin/쫄그룹/졸이.tin" }],
   },
   {
     name: "졸삼",
     session: "jjol3",
-    startScript: "start_jjol.sh",
+    startScript: "start_jjol3.sh",
+    solo: true,
     files: [{ label: "졸삼", path: "tin/쫄그룹/졸삼.tin" }],
   },
   {
     name: "졸사",
     session: "jjol4",
-    startScript: "start_jjol.sh",
+    startScript: "start_jjol4.sh",
+    solo: true,
     files: [{ label: "졸사", path: "tin/쫄그룹/졸사.tin" }],
   },
   {
     name: "졸오",
     session: "jjol5",
-    startScript: "start_jjol.sh",
+    startScript: "start_jjol5.sh",
+    solo: true,
     files: [{ label: "졸오", path: "tin/쫄그룹/졸오.tin" }],
   },
   {
     name: "졸육",
     session: "jjol6",
-    startScript: "start_jjol.sh",
+    startScript: "start_jjol6.sh",
+    solo: true,
     files: [{ label: "졸육", path: "tin/쫄그룹/졸육.tin" }],
   },
 ]
@@ -288,20 +302,24 @@ function GroupCard({
   const s = group.session
   const connect = connectCmd(group)
   // 접속은 세션을 통째로 끊고 다시 띄우므로, 무엇이 일어나는지 확인창에 그대로 적는다.
-  // ★쫄은 범위가 더 넓다★ start_jjol.sh 하나가 jjol1~jjol6 을 전부 만들기 때문에,
-  //   한 카드에서 눌러도 쫄 6명이 함께 재시작된다. 그 사실을 문구에 적어둔다.
-  const isJjol = group.startScript === "start_jjol.sh"
-  const connectConfirm = isJjol
+  // ★쫄은 세션에 캐릭터가 한 명뿐이라 영향 범위가 좁다★ 나머지 그룹은 세션 하나에
+  //   여러 명이 들어 있어 "그 그룹 전원" 이 끊기므로, 문구를 그에 맞게 나눈다.
+  //   (2026-08-15 시작 스크립트를 캐릭별로 쪼개기 전에는 쫄도 6명이 함께 끊겼다)
+  const isSolo = group.solo === true
+  const connectConfirm = isSolo
     ? `[${group.name}] 접속\n\n` +
-      `start_jjol.sh 는 쫄 6명(jjol1~jjol6)을 통째로 다시 띄웁니다.\n` +
-      `${group.name} 뿐 아니라 나머지 5명도 함께 끊겼다 새로 시작합니다.\n\n계속할까요?`
+      `${s}(${group.name})만 끊고 다시 띄웁니다.\n` +
+      `다른 쫄은 건드리지 않습니다.\n\n계속할까요?`
     : `[${group.name}] 접속\n\n` +
       `${s} 세션을 끊고 다시 띄웁니다.\n` +
       `사냥 중이면 그 그룹 전원이 즉시 끊깁니다.\n\n계속할까요?`
-  const killConfirm =
-    `[${group.name}] 끊기\n\n` +
-    `${s} 세션을 종료합니다.\n` +
-    `그 그룹 전원이 즉시 끊깁니다.\n\n계속할까요?`
+  const killConfirm = isSolo
+    ? `[${group.name}] 끊기\n\n` +
+      `${s}(${group.name}) 세션을 종료합니다.\n` +
+      `다른 쫄은 건드리지 않습니다.\n\n계속할까요?`
+    : `[${group.name}] 끊기\n\n` +
+      `${s} 세션을 종료합니다.\n` +
+      `그 그룹 전원이 즉시 끊깁니다.\n\n계속할까요?`
 
   return (
     <article className="cc-card">
