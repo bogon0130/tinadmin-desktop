@@ -78,27 +78,32 @@ function fmtSize(n: number) {
   return n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 }
 
-const GROUP_TABS = ["천마신군그룹", "한비광그룹", "기본설정그룹"] as const
+const GROUP_TABS = ["천마신군그룹", "한비광그룹", "쫄그룹", "기본설정그룹"] as const
 type GroupTab = (typeof GROUP_TABS)[number]
 
 /**
  * 폴더 경로(dir, 최상위 파일은 "") -> 그룹 탭.
  *
- * 실제 tin/ 폴더명이 "천마신군그룹"/"한비광그룹" 그대로라 그 접두사로만
- * 가른다. 그 둘에 안 속하는 나머지 전부(1_기본/2_교황/2_대부/2_마왕/2_장군/
+ * 실제 tin/ 폴더명이 "천마신군그룹"/"한비광그룹"/"쫄그룹" 그대로라 그 접두사로만
+ * 가른다. 그 셋에 안 속하는 나머지 전부(1_기본/2_교황/2_대부/2_마왕/2_장군/
  * 3_직업별_자반/_combos/stats/최상위 낱개 파일)는 "기본설정그룹"으로 묶는다
  * — 애매한 파일은 없었다(0단계 조사에서 실측 확인).
+ *
+ * 쫄그룹은 2026-08-15 추가. 그 폴더에는 combo 하위폴더가 없고 졸일~졸육.tin 6개만
+ * 있다(쫄은 tin 하나로 완결돼 조합 파일을 안 쓴다).
  */
 function groupOfDir(dir: string): GroupTab {
   if (dir === "천마신군그룹" || dir.startsWith("천마신군그룹/")) return "천마신군그룹"
   if (dir === "한비광그룹" || dir.startsWith("한비광그룹/")) return "한비광그룹"
+  if (dir === "쫄그룹" || dir.startsWith("쫄그룹/")) return "쫄그룹"
   return "기본설정그룹"
 }
 
-/** 그룹의 "루트" dir — 그룹 이름과 같은 폴더(천마/한비광)거나 최상위("", 기본설정그룹). */
+/** 그룹의 "루트" dir — 그룹 이름과 같은 폴더(천마/한비광/쫄)거나 최상위("", 기본설정그룹). */
 function groupRootDir(g: GroupTab): string {
   if (g === "천마신군그룹") return "천마신군그룹"
   if (g === "한비광그룹") return "한비광그룹"
+  if (g === "쫄그룹") return "쫄그룹"
   return ""
 }
 

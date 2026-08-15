@@ -39,16 +39,26 @@ const HOST_EXTERNAL = "kimbogon@ssh.bogon.kr"
 type TinFile = { label: string; path: string }
 
 /** 그룹 카드 하나 */
-type GroupDef = { name: string; session: string; files: TinFile[] }
+type GroupDef = {
+  name: string
+  session: string
+  files: TinFile[]
+  /** 세션명에서 유추되는 이름과 다른 경우에만 적는다(startScriptOf 참고). */
+  startScript?: string
+}
 
 /**
  * 그룹을 띄우는 시작 스크립트 이름.
  *
- * ★goblin 만 이름 규칙에서 벗어난다★ start_goblin.sh 가 아니라 start_tmux.sh 가
- *   만든다(실측 2026-08-14). 나머지 5개는 start_{세션명}.sh 규칙 그대로다.
+ * ★규칙에서 벗어나는 게 둘 있다★
+ *   - goblin : start_goblin.sh 가 아니라 start_tmux.sh 가 만든다(실측 2026-08-14).
+ *   - 쫄 6캐릭: 세션은 jjol1~jjol6 으로 여섯인데 스크립트는 start_jjol.sh 하나가
+ *     여섯을 전부 만든다. 그래서 세션명으로 유추할 수 없고 GROUPS 에서 직접 준다.
+ *   그 외에는 start_{세션명}.sh 규칙 그대로다.
  */
-function startScriptOf(session: string): string {
-  return session === "goblin" ? "start_tmux.sh" : `start_${session}.sh`
+function startScriptOf(group: GroupDef): string {
+  if (group.startScript) return group.startScript
+  return group.session === "goblin" ? "start_tmux.sh" : `start_${group.session}.sh`
 }
 
 /**
@@ -67,11 +77,12 @@ function startScriptOf(session: string): string {
  *   창이 그대로 tmux 화면으로 바뀌어 "접속하면 바로 보인다".
  *   세미콜론은 check_remote 가 막지 않는다(겹따옴표·제어문자만 차단).
  */
-function connectCmd(session: string): string {
+function connectCmd(group: GroupDef): string {
+  const s = group.session
   return (
-    `tmux kill-session -t ${session} 2>/dev/null; ` +
-    `bash ~/projects/goblin/${startScriptOf(session)}; ` +
-    `tmux attach -t ${session}`
+    `tmux kill-session -t ${s} 2>/dev/null; ` +
+    `bash ~/projects/goblin/${startScriptOf(group)}; ` +
+    `tmux attach -t ${s}`
   )
 }
 
@@ -130,6 +141,48 @@ const GROUPS: GroupDef[] = [
       { label: "마왕", path: "tin/3_직업별_자반/직업_마왕.tin" },
       { label: "마왕버프", path: "tin/3_직업별_자반/직업_마왕_버프.tin" },
     ],
+  },
+  // --- 쫄 6캐릭 (2026-08-15 추가) ---
+  // 다른 그룹과 달리 캐릭터 하나가 곧 그룹이고 세션도 각자다(jjol1~jjol6).
+  // tin 도 조합 없이 하나뿐이라 파일 줄이 한 개다.
+  //
+  // ★start_jjol.sh 는 6개를 통째로 만든다★ 그래서 한 카드의 [접속] 을 눌러도
+  //   쫄 6명 전부가 끊겼다 다시 뜬다. 아래 GroupCard 의 확인창이 그 사실을 적어준다.
+  {
+    name: "졸일",
+    session: "jjol1",
+    startScript: "start_jjol.sh",
+    files: [{ label: "졸일", path: "tin/쫄그룹/졸일.tin" }],
+  },
+  {
+    name: "졸이",
+    session: "jjol2",
+    startScript: "start_jjol.sh",
+    files: [{ label: "졸이", path: "tin/쫄그룹/졸이.tin" }],
+  },
+  {
+    name: "졸삼",
+    session: "jjol3",
+    startScript: "start_jjol.sh",
+    files: [{ label: "졸삼", path: "tin/쫄그룹/졸삼.tin" }],
+  },
+  {
+    name: "졸사",
+    session: "jjol4",
+    startScript: "start_jjol.sh",
+    files: [{ label: "졸사", path: "tin/쫄그룹/졸사.tin" }],
+  },
+  {
+    name: "졸오",
+    session: "jjol5",
+    startScript: "start_jjol.sh",
+    files: [{ label: "졸오", path: "tin/쫄그룹/졸오.tin" }],
+  },
+  {
+    name: "졸육",
+    session: "jjol6",
+    startScript: "start_jjol.sh",
+    files: [{ label: "졸육", path: "tin/쫄그룹/졸육.tin" }],
   },
 ]
 
@@ -233,12 +286,18 @@ function GroupCard({
   onOpenFile: (name: string) => void
 }) {
   const s = group.session
-  const connect = connectCmd(s)
+  const connect = connectCmd(group)
   // 접속은 세션을 통째로 끊고 다시 띄우므로, 무엇이 일어나는지 확인창에 그대로 적는다.
-  const connectConfirm =
-    `[${group.name}] 접속\n\n` +
-    `${s} 세션을 끊고 다시 띄웁니다.\n` +
-    `사냥 중이면 그 그룹 전원이 즉시 끊깁니다.\n\n계속할까요?`
+  // ★쫄은 범위가 더 넓다★ start_jjol.sh 하나가 jjol1~jjol6 을 전부 만들기 때문에,
+  //   한 카드에서 눌러도 쫄 6명이 함께 재시작된다. 그 사실을 문구에 적어둔다.
+  const isJjol = group.startScript === "start_jjol.sh"
+  const connectConfirm = isJjol
+    ? `[${group.name}] 접속\n\n` +
+      `start_jjol.sh 는 쫄 6명(jjol1~jjol6)을 통째로 다시 띄웁니다.\n` +
+      `${group.name} 뿐 아니라 나머지 5명도 함께 끊겼다 새로 시작합니다.\n\n계속할까요?`
+    : `[${group.name}] 접속\n\n` +
+      `${s} 세션을 끊고 다시 띄웁니다.\n` +
+      `사냥 중이면 그 그룹 전원이 즉시 끊깁니다.\n\n계속할까요?`
   const killConfirm =
     `[${group.name}] 끊기\n\n` +
     `${s} 세션을 종료합니다.\n` +

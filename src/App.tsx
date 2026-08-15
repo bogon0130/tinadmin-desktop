@@ -54,11 +54,24 @@ type ViewId =
   | "items"
   | "doc-한비광그룹"
   | "doc-천마신군그룹"
+  | "doc-졸일"
+  | "doc-졸이"
+  | "doc-졸삼"
+  | "doc-졸사"
+  | "doc-졸오"
+  | "doc-졸육"
 
 /** 그룹 대시보드 메뉴 id -> 그룹명 */
 const GROUP_VIEWS: Record<string, string> = {
   "doc-한비광그룹": "한비광그룹",
   "doc-천마신군그룹": "천마신군그룹",
+  // 쫄 6캐릭 — config.GROUPS 에 캐릭터 이름 그대로 등록돼 있다(그룹당 1명).
+  "doc-졸일": "졸일",
+  "doc-졸이": "졸이",
+  "doc-졸삼": "졸삼",
+  "doc-졸사": "졸사",
+  "doc-졸오": "졸오",
+  "doc-졸육": "졸육",
 }
 
 type MenuItem = { id: ViewId; label: string; icon: typeof BookOpen }
@@ -72,6 +85,14 @@ const MENU: MenuItem[] = [
   // 그룹별 대시보드
   { id: "doc-한비광그룹", label: "한비광그룹", icon: BookOpen },
   { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
+  // 쫄 6캐릭 — 메뉴는 평면 구조라 중첩이 안 된다(MENU.map 한 번으로 그린다).
+  // 천마신군그룹 아래에 딸린 것처럼 보이게 라벨 앞에 └ 를 붙여 흉내만 낸다.
+  { id: "doc-졸일", label: "└ 졸일", icon: BookOpen },
+  { id: "doc-졸이", label: "└ 졸이", icon: BookOpen },
+  { id: "doc-졸삼", label: "└ 졸삼", icon: BookOpen },
+  { id: "doc-졸사", label: "└ 졸사", icon: BookOpen },
+  { id: "doc-졸오", label: "└ 졸오", icon: BookOpen },
+  { id: "doc-졸육", label: "└ 졸육", icon: BookOpen },
   { id: "files", label: "파일 관리", icon: FolderCog },
   { id: "combo", label: "접속 빌더", icon: Plug },
   { id: "items", label: "아이템 도감", icon: Swords },
