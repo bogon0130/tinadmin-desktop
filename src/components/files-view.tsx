@@ -89,7 +89,8 @@ type GroupTab = (typeof GROUP_TABS)[number]
  * 3_직업별_자반/_combos/stats/최상위 낱개 파일)는 "기본설정그룹"으로 묶는다
  * — 애매한 파일은 없었다(0단계 조사에서 실측 확인).
  *
- * 쫄그룹은 2026-08-15 추가. 그 폴더에는 combo 하위폴더가 없고 졸일~졸육.tin 6개만
+ * 쫄그룹은 2026-08-15 추가. 그 폴더에는 combo 하위폴더가 없고 졸이~졸육.tin 5개만
+ * (졸일은 2026-08-21 에 한비광그룹 폴더로 옮겨졌다)
  * 있다(쫄은 tin 하나로 완결돼 조합 파일을 안 쓴다).
  */
 function groupOfDir(dir: string): GroupTab {

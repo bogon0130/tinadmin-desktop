@@ -118,8 +118,24 @@ function comboPath(groupName: string, charName: string): string {
  * name)에서 조합한다. 여기엔 실행 코드가 없다 — 문자열을 만들어 클립보드에
  * 복사할 뿐이다.
  */
+/**
+ * combo 를 거치지 않고 tin 하나로 완결되는 캐릭터.
+ *
+ * ★졸일이 유일한 예외다★ 쫄 자동순환 캐릭터라 그룹기본을 얹을 게 없어
+ *   combo/졸일.tin 이 아예 없다. 2026-08-21 에 쫄그룹(jjol1 단독 세션)에서
+ *   한비광그룹(goblin)으로 편입하면서 이 그룹에 combo 없는 캐릭터가 처음 생겼다.
+ *   여기 안 넣으면 [접속] 이 없는 파일을 실행해 그 창이 조용히 죽는다.
+ *   `start_tmux.sh` 의 졸일 줄과 같은 경로여야 한다.
+ */
+const NO_COMBO = new Set(["졸일"])
+
+/** tt++ 가 실제로 실행할 파일 — combo 가 있으면 combo, 없으면 원본 직결. */
+function launchPath(groupName: string, name: string): string {
+  return NO_COMBO.has(name) ? `tin/${sourceTinRel(groupName, name)}` : comboPath(groupName, name)
+}
+
 function respawnCmd(session: string, groupName: string, name: string, pane: number): string {
-  return `tmux respawn-pane -k -t ${session}:${pane} 'cd ~/projects/goblin && tt++ ${comboPath(groupName, name)}'`
+  return `tmux respawn-pane -k -t ${session}:${pane} 'cd ~/projects/goblin && tt++ ${launchPath(groupName, name)}'`
 }
 
 /**
@@ -128,7 +144,9 @@ function respawnCmd(session: string, groupName: string, name: string, pane: numb
  * ★규칙 하나로 안 된다★ 한비광그룹은 {그룹}/{캐릭터}.tin 로 딱 맞지만,
  *   천마신군그룹은 직업 접두사가 붙어 있다(대부_천마신군.tin 처럼).
  *   그래서 접두사가 붙는 쪽만 표로 적어두고 나머지는 규칙을 쓴다.
- *   9개 전부 combo 파일이 실제로 #read 하는 대상과 대조해 확인했다(2026-08-21).
+ *   combo 가 있는 9명은 전부 combo 파일이 실제로 #read 하는 대상과 대조해
+ *   확인했다(2026-08-21). 졸일은 combo 가 없고 규칙(`한비광그룹/졸일.tin`)이
+ *   그대로 맞으므로 표에 넣지 않는다 — 실행 경로는 NO_COMBO 가 가른다.
  *
  *   /api/groups 의 direct_files 를 안 쓰는 이유는 comboPath 와 같다 — 한비광그룹은
  *   FILE_TARGETS 에 등록이 없어 빈 배열이 온다.

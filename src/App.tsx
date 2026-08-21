@@ -66,7 +66,7 @@ const GROUP_VIEWS: Record<string, string> = {
 // ★쫄그룹("jjol")은 여기 넣지 않는다★ GROUP_VIEWS 는 /api/groups 로 세션 하나의
 //   창 상태를 그리는 GroupDashboard 로 이어지는데, 쫄은 캐릭터마다 세션이 따로라
 //   그 모양이 맞지 않는다. 게다가 config.GROUPS 에 "쫄그룹" 이라는 항목 자체가 없고
-//   졸일~졸육 6개가 각각 등록돼 있어서 그릴 그룹을 못 찾는다.
+//   졸이~졸육 5개가 각각 등록돼 있어서 그릴 그룹을 못 찾는다.
 //   그래서 아래 본문에서 JjolView 를 따로 렌더한다.
 
 type MenuItem = { id: ViewId; label: string; icon: typeof BookOpen }

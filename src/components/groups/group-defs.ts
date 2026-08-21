@@ -17,6 +17,8 @@ export const GROUPS: GroupDef[] = [
       { label: "기본", path: "tin/한비광그룹/한비광그룹기본.tin" },
       // 이 카드의 "리더" 는 공용 리더.tin 이 아니라 리더 캐릭터 본인의 파일이다.
       { label: "리더", path: "tin/한비광그룹/한비광.tin" },
+      // 졸일은 combo 가 없어 원본 직결이다(2026-08-21 쫄그룹에서 편입).
+      { label: "졸일", path: "tin/한비광그룹/졸일.tin" },
     ],
   },
   {

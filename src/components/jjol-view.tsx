@@ -3,7 +3,8 @@ import { Users } from "lucide-react"
 import { GroupCard, type GroupDef } from "@/components/groups/group-card"
 
 /**
- * 쫄그룹 화면 — 졸일~졸육 6장을 한 화면에 모아 놓는다.
+ * 쫄그룹 화면 — 졸이~졸육 5장을 한 화면에 모아 놓는다.
+ * (졸일은 2026-08-21 에 한비광그룹 goblin 세션으로 편입돼 여기서 빠졌다.)
  *
  * ★왜 별도 화면인가★ 2026-08-15 처음엔 좌측 메뉴에 "└ 졸일"~"└ 졸육" 6개를
  *   낱개로 늘어놓고 카드도 메인페이지에 섞어 놨는데, 메뉴가 6줄이나 늘어 다른
@@ -13,7 +14,7 @@ import { GroupCard, type GroupDef } from "@/components/groups/group-card"
  * ★GroupView(천마신군·한비광)와는 다른 컴포넌트다★ 그쪽은 /api/groups 를 불러
  *   세션 하나의 창 상태를 그리는 대시보드고, 쫄은 캐릭터마다 세션이 따로라
  *   그 구조에 맞지 않는다. 게다가 config.GROUPS 에는 "쫄그룹" 이라는 항목 자체가
- *   없고 졸일~졸육 6개가 각각 등록돼 있어서, GROUP_VIEWS 로 태우면 그릴 그룹을
+ *   없고 졸이~졸육 5개가 각각 등록돼 있어서, GROUP_VIEWS 로 태우면 그릴 그룹을
  *   못 찾는다. 그래서 App.tsx 에서 GROUP_VIEWS 를 거치지 않고 바로 이 화면을 연다.
  *
  * 카드 내용(5버튼·tin 파일줄·solo 확인창·startScript)은 메인페이지에 있던 것을
@@ -32,13 +33,6 @@ import { GroupCard, type GroupDef } from "@/components/groups/group-card"
  *   이제 각 카드의 [접속] 은 자기 세션 하나만 끊고 다시 띄운다(solo).
  */
 const JJOL_GROUPS: GroupDef[] = [
-  {
-    name: "졸일",
-    session: "jjol1",
-    startScript: "start_jjol1.sh",
-    solo: true,
-    files: [{ label: "졸일", path: "tin/쫄그룹/졸일.tin" }],
-  },
   {
     name: "졸이",
     session: "jjol2",
