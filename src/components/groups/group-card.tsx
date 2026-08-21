@@ -119,7 +119,7 @@ function ReadCopyButton({ path }: { path: string }) {
  * needConfirm 이 켜진 버튼(접속/끊기)은 사냥 중인 세션을 끊으므로 확인을 먼저 받는다.
  * 뷰(attach)는 보기만 하는 것이라 확인 없이 바로 연다.
  */
-function RunButton({
+export function RunButton({
   label,
   icon,
   group,

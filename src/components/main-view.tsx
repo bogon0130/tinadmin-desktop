@@ -1,6 +1,7 @@
 import { House } from "lucide-react"
 
-import { GroupCard, type GroupDef } from "@/components/groups/group-card"
+import { GroupCard } from "@/components/groups/group-card"
+import { GROUPS } from "@/components/groups/group-defs"
 
 /**
  * 메인페이지 — 앱을 켜면 가장 먼저 뜨는 화면.
@@ -15,63 +16,6 @@ import { GroupCard, type GroupDef } from "@/components/groups/group-card"
  *   에 있다.
  */
 
-/** 그룹 순서 — 리더 그룹 2개를 먼저, 직업 그룹 4개를 뒤에 */
-const GROUPS: GroupDef[] = [
-  {
-    name: "한비광",
-    session: "goblin",
-    files: [
-      { label: "기본", path: "tin/한비광그룹/한비광그룹기본.tin" },
-      // 이 카드의 "리더" 는 공용 리더.tin 이 아니라 리더 캐릭터 본인의 파일이다.
-      { label: "리더", path: "tin/한비광그룹/한비광.tin" },
-    ],
-  },
-  {
-    name: "천마신군",
-    session: "chunma",
-    files: [
-      { label: "기본", path: "tin/천마신군그룹/천마그룹기본.tin" },
-      { label: "리더", path: "tin/3_직업별_자반/리더.tin" },
-    ],
-  },
-  {
-    name: "장군",
-    session: "janggun",
-    files: [
-      { label: "기본", path: "tin/1_기본/기본.tin" },
-      { label: "장군", path: "tin/3_직업별_자반/직업_장군.tin" },
-      { label: "리더", path: "tin/3_직업별_자반/리더.tin" },
-    ],
-  },
-  {
-    name: "대부",
-    session: "daebu",
-    files: [
-      { label: "기본", path: "tin/1_기본/기본.tin" },
-      { label: "대부", path: "tin/3_직업별_자반/직업_대부.tin" },
-      { label: "리더", path: "tin/3_직업별_자반/리더.tin" },
-    ],
-  },
-  {
-    // 교황·마왕에는 리더 줄이 없다 — 대신 직업 버프 자반이 붙는다.
-    name: "교황",
-    session: "gyohwang",
-    files: [
-      { label: "기본", path: "tin/1_기본/기본.tin" },
-      { label: "교황", path: "tin/3_직업별_자반/직업_교황.tin" },
-      { label: "교황버프", path: "tin/3_직업별_자반/직업_교황_버프.tin" },
-    ],
-  },
-  {
-    name: "마왕",
-    session: "mawang",
-    files: [
-      { label: "기본", path: "tin/1_기본/기본.tin" },
-      { label: "마왕", path: "tin/3_직업별_자반/직업_마왕.tin" },
-      { label: "마왕버프", path: "tin/3_직업별_자반/직업_마왕_버프.tin" },
-    ],
-  },
-]
 
 export function MainView({ onOpenFile }: { onOpenFile: (name: string) => void }) {
   return (

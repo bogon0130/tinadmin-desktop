@@ -260,7 +260,14 @@ export default function App() {
             />
           )}
           {GROUP_VIEWS[view] && (
-            <GroupView key={view} groupName={GROUP_VIEWS[view]} />
+            <GroupView
+              key={view}
+              groupName={GROUP_VIEWS[view]}
+              onOpenFile={(name) => {
+                setOpenFile(name)
+                setView("files")
+              }}
+            />
           )}
         </main>
       </div>

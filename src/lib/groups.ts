@@ -24,6 +24,13 @@ export interface GroupChar {
   stats_logged: boolean
 }
 
+/** tmux 창 하나 — 이름과 **실제 창번호**. */
+export interface LiveWindow {
+  /** tmux 창번호. respawn-pane -t 세션:번호 에 그대로 쓰는 값이다. */
+  index: number
+  name: string
+}
+
 export interface GroupInfo {
   name: string
   characters: GroupChar[]
@@ -33,9 +40,15 @@ export interface GroupInfo {
   windows: string[]
   /** tmux 세션 자체가 떠있는지 */
   live: boolean
-  /** 실제 tmux 창 이름 — list-windows 순서 그대로라 창번호(0,1,2..)와 일치한다 */
-  live_windows: string[]
-  /** 설정엔 있는데 실제 창은 없는 이름 (예: 한비광그룹의 "복병" — 알려진 설정 오류) */
+  /**
+   * 실제 tmux 창 목록 — 서버가 창번호(index)를 직접 실어 보낸다.
+   *
+   * ★배열 위치를 창번호로 삼으면 안 된다★
+   *   창 하나가 죽어 번호가 끊기면(0,2,3) 위치와 번호가 어긋난다.
+   *   반드시 각 항목의 index 를 쓸 것.
+   */
+  live_windows: LiveWindow[]
+  /** 설정엔 있는데 실제 창은 없는 이름 (예: 한비광그룹의 "복병" — 실제로는 daebu 세션에서 뜬다) */
   missing_windows: string[]
   /** 실제로는 있는데 설정에 없는 창 */
   extra_windows: string[]

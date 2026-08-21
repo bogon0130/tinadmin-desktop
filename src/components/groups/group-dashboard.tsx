@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Check, Copy, Loader2, RefreshCw, Server } from "lucide-react"
+import { Check, Copy, Eye, Loader2, PlugZap, RefreshCw, Server } from "lucide-react"
 import { toast } from "sonner"
 
 import { getStatsMe, type CharStats, type LevelEvent } from "@/lib/api"
@@ -7,6 +7,8 @@ import { getGroups, type GroupInfo } from "@/lib/groups"
 import { EMPTY_STAT, getFavStat, type FavStat } from "@/lib/favstats"
 import { getNote, saveNote } from "@/lib/notes-store"
 import { copyText } from "@/lib/clipboard"
+import { GroupCard, HOST_INTERNAL, RunButton } from "@/components/groups/group-card"
+import { groupDefBySession } from "@/components/groups/group-defs"
 
 /**
  * 그룹 캐릭터 5명의 stats_fav id.
@@ -120,6 +122,48 @@ function respawnCmd(session: string, groupName: string, name: string, pane: numb
   return `tmux respawn-pane -k -t ${session}:${pane} 'cd ~/projects/goblin && tt++ ${comboPath(groupName, name)}'`
 }
 
+/**
+ * 캐릭터의 "원본" tin 파일 경로 (tin/ 아래 상대경로).
+ *
+ * ★규칙 하나로 안 된다★ 한비광그룹은 {그룹}/{캐릭터}.tin 로 딱 맞지만,
+ *   천마신군그룹은 직업 접두사가 붙어 있다(대부_천마신군.tin 처럼).
+ *   그래서 접두사가 붙는 쪽만 표로 적어두고 나머지는 규칙을 쓴다.
+ *   9개 전부 combo 파일이 실제로 #read 하는 대상과 대조해 확인했다(2026-08-21).
+ *
+ *   /api/groups 의 direct_files 를 안 쓰는 이유는 comboPath 와 같다 — 한비광그룹은
+ *   FILE_TARGETS 에 등록이 없어 빈 배열이 온다.
+ */
+const SOURCE_TIN: Record<string, string> = {
+  천마신군: "천마신군그룹/대부_천마신군.tin",
+  진풍백: "천마신군그룹/장군_진풍백.tin",
+  매유진: "천마신군그룹/마왕_매유진.tin",
+  벽력자: "천마신군그룹/교황_벽력자.tin",
+  천운악: "천마신군그룹/교황_천운악.tin",
+}
+
+/** 파일관리 화면이 쓰는 경로(tin/ 접두사 없음). */
+function sourceTinRel(groupName: string, name: string): string {
+  return SOURCE_TIN[name] ?? `${groupName}/${name}.tin`
+}
+
+/**
+ * 캐릭터 한 명만 다시 띄우고 그 창을 붙잡는 명령.
+ *
+ * ★-k 는 대상 창을 죽인다 — 창번호가 곧 안전장치다★ 여기 들어오는 pane 은
+ *   paneIndexMap 이 서버(tmux list-windows)에서 그대로 받아온 값이라야 한다.
+ *   배열 위치로 추측한 값을 넣으면 엉뚱한 캐릭터가 끊긴다.
+ *
+ * attach 에 창까지 지정해 붙으면 그 캐릭터 화면이 바로 뜬다.
+ * (홑따옴표만 쓴다 — check_remote 가 겹따옴표를 막는다.)
+ */
+function connectCharCmd(session: string, groupName: string, name: string, pane: number): string {
+  return (
+    `${respawnCmd(session, groupName, name, pane)}; ` +
+    `tmux select-window -t ${session}:${pane}; ` +
+    `tmux attach -t ${session}:${pane}`
+  )
+}
+
 function CopyButton({ text, label, full }: { text: string; label: string; full?: boolean }) {
   const [done, setDone] = useState(false)
   return (
@@ -152,59 +196,10 @@ function CopyButton({ text, label, full }: { text: string; label: string; full?:
  *   붙여넣어 실행하면 그 세션이 끊겼다가 스크립트에 적힌 구성으로 다시 뜬다.
  *   카드 개별 "완전재접"(그 캐릭터 한 명만 되살림)과는 영향 범위가 다르다.
  */
-function RespawnAllBox({ text }: { text: string }) {
-  const [done, setDone] = useState(false)
-  return (
-    <div className="cc-panel">
-      <div className="cc-panel-title" style={{ marginBottom: 8 }}>
-        한방 접속 (전체 재시작)
-      </div>
-      <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
-        <textarea
-          readOnly
-          value={text}
-          rows={3}
-          onFocus={(e) => e.currentTarget.select()}
-          style={{
-            flex: 1,
-            minWidth: 0,
-            resize: "vertical",
-            fontFamily: "var(--font-mono)",
-            fontSize: 11,
-            lineHeight: 1.5,
-            padding: 10,
-            borderRadius: 2,
-            border: "1px solid var(--border)",
-            background: "var(--surface-2)",
-            color: "var(--text)",
-          }}
-        />
-        <button
-          onClick={async () => {
-            if (await copyText(text)) {
-              setDone(true)
-              setTimeout(() => setDone(false), 1500)
-              toast.success("그룹 전체 재시작 명령 복사됨")
-            } else {
-              toast.error("복사하지 못했습니다")
-            }
-          }}
-          disabled={!text}
-          className="cc-btn"
-          style={{ flexShrink: 0, alignSelf: "center", fontWeight: 700 }}
-        >
-          {done ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-          {done ? "복사됨!" : "복사"}
-        </button>
-      </div>
-    </div>
-  )
-}
-
 /**
  * 자반 중지/실행 복사 카드 6개 — #ignore 명령을 클립보드에 복사만 한다.
  *
- * ★서버 호출 없음★ RespawnAllBox 처럼 세션·그룹으로 명령을 조립하는 게 아니라
+ * ★서버 호출 없음★ 세션·그룹으로 명령을 조립하는 게 아니라
  *   고정 문자열을 그대로 복사만 하므로 group/session 정보가 전혀 필요 없다
  *   — 그래서 두 그룹(한비광그룹/천마신군그룹) 어디서 렌더해도 항상 같은
  *   6개가 뜬다. copyText/toast 피드백은 CopyButton과 동일하게 재사용한다.
@@ -339,47 +334,55 @@ function daysAgoStr(n: number) {
 }
 
 /**
- * live_windows 표시 순서 보정 — goblin:1 은 담화린, goblin:2 는 최상희다.
+ * 세션이 꺼져 있을 때 쓰는 대체 순서 — config.py GROUPS 등록 순서.
  *
- * ★왜 live_windows 만 고치는가★
- *   tmux 실제 창 순서(live_windows)는 1번=최상희, 2번=담화린으로 나와서
- *   자리가 바뀌어 있다. 반면 세션이 꺼졌을 때 쓰는 대체 순서(config.py
- *   GROUPS 순서)는 이미 담화린(1번)·최상희(2번)로 맞게 들어있으므로
- *   여기까지 건드리면 오히려 다시 틀어진다.
- *
- * API가 주는 배열 자체는 안 바꾸고, 1번·2번 "자리"에 앉는 이름만
- * 바꿔치기한다 — 이름이 바뀌면 comboPath/스탯 조회 등 나머지는 전부
- * 이름 기준이라 자동으로 맞게 따라온다.
+ * "복병"은 한비광그룹에 등록돼 있지만 실제로는 daebu 세션에서 뜬다.
+ * goblin 세션의 창번호와 무관하므로 항상 제외한다.
  */
-function fixLiveOrder(groupName: string, names: string[]): string[] {
-  if (groupName !== "한비광그룹") return names
-  const out = [...names]
-  const i1 = out.indexOf("최상희")
-  const i2 = out.indexOf("담화린")
-  if (i1 !== -1 && i2 !== -1) {
-    ;[out[i1], out[i2]] = [out[i2], out[i1]]
-  }
-  return out
+function configOrder(g: GroupInfo): string[] {
+  return g.windows.filter((w) => w !== "복병")
 }
 
-/** 카드에 보여줄 순서 — 살아있으면 실제 tmux 창번호 순서, 죽어있으면 설정 순서(복병 제외). */
+/** 카드에 보여줄 순서 — 살아있으면 실제 tmux 창 순서, 죽어있으면 설정 순서. */
 function orderedNames(g: GroupInfo): string[] {
-  if (g.live && g.live_windows.length > 0) return fixLiveOrder(g.name, g.live_windows)
-  // 세션이 꺼져 있을 때의 대체 순서. "복병"은 config.py GROUPS 에 등록만 되어
-  //있고 실제 창은 없는 알려진 설정 오류라 항상 제외한다(1단계 조사 결과).
-  return g.windows.filter((w) => w !== "복병")
+  if (g.live && g.live_windows.length > 0) return g.live_windows.map((w) => w.name)
+  return configOrder(g)
+}
+
+/**
+ * 캐릭터 이름 → 실제 tmux 창번호.
+ *
+ * ★여기가 접속·완전재접 명령의 안전장치다★
+ *   respawn-pane 은 -k 로 대상 창을 죽인다. 창번호가 한 칸이라도 어긋나면
+ *   엉뚱한 캐릭터가 끊긴다. 그래서 세션이 살아있는 동안에는 서버가 tmux 에서
+ *   직접 읽어온 index 를 그대로 쓰고, 배열 위치로 추측하지 않는다.
+ *
+ *   (예전에는 위치로 추측한 데다 한비광그룹만 최상희↔담화린 자리를 바꿔치기해서,
+ *    담화린 카드의 명령이 실제로는 최상희 창을 죽이고 있었다. 2026-08-21 수정.)
+ *
+ *   세션이 꺼져 있으면 tmux 에 물어볼 대상이 없다. 이때만 설정 순서의 위치를
+ *   쓰는데, 어차피 창이 없어 respawn 이 성립하지 않으므로 시작 스크립트로
+ *   세션을 먼저 띄우는 게 정상 경로다.
+ */
+function paneIndexMap(g: GroupInfo): Map<string, number> {
+  const m = new Map<string, number>()
+  if (g.live && g.live_windows.length > 0) {
+    for (const w of g.live_windows) m.set(w.name, w.index)
+    return m
+  }
+  configOrder(g).forEach((n, i) => m.set(n, i))
+  return m
 }
 
 /**
  * 천마신군그룹 카드 "화면 표시" 순서 — 요청된 고정 순서.
  *
- * ★pane 번호(windowIndex)는 안 건드린다★
- *   respawnCmd 는 order(실제 tmux 창번호 순서) 안에서의 위치를 그대로 pane
- *   번호로 쓴다. 여기서 만드는 배열은 카드가 화면에 그려지는 "순서"만
- *   바꾸는 용도라, 실제 pane 번호는 항상 order.indexOf(name) 으로 따로
- *   구해서 넘긴다 — 접속 명령이 틀어지지 않는다.
+ * ★창번호(windowIndex)는 안 건드린다★
+ *   여기서 만드는 배열은 카드가 화면에 그려지는 "순서"만 바꾼다. 실제 창번호는
+ *   paneIndexMap(서버가 tmux 에서 읽어온 index)이 이름으로 따로 주므로,
+ *   표시 순서를 아무리 바꿔도 접속 명령은 틀어지지 않는다.
  */
-const CHUNMA_DISPLAY_ORDER = ["천마신군", "진풍백", "매유진", "벽력자", "천운악", "커"]
+const CHUNMA_DISPLAY_ORDER = ["천마신군", "진풍백", "매유진", "벽력자", "천운악"]
 
 /** 한비광그룹은 기존 순서(order) 그대로, 천마신군그룹만 위 고정 순서로 재배열한다. */
 function displayOrder(groupName: string, names: string[]): string[] {
@@ -388,7 +391,13 @@ function displayOrder(groupName: string, names: string[]): string[] {
   return [...names].sort((a, b) => (rank.get(a) ?? 99) - (rank.get(b) ?? 99))
 }
 
-export function GroupDashboard({ groupName }: { groupName: string }) {
+export function GroupDashboard({
+  groupName,
+  onOpenFile,
+}: {
+  groupName: string
+  onOpenFile: (name: string) => void
+}) {
   const [group, setGroup] = useState<GroupInfo | null>(null)
   const [groupLoading, setGroupLoading] = useState(true)
   const [from, setFrom] = useState(daysAgoStr(6))
@@ -441,6 +450,11 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
   }, [loadStats30])
 
   const order = useMemo(() => (group ? orderedNames(group) : []), [group])
+  // 이름 → 실제 tmux 창번호. 카드의 접속/완전재접 명령이 이 값만 쓴다.
+  const paneByName = useMemo(
+    () => (group ? paneIndexMap(group) : new Map<string, number>()),
+    [group],
+  )
   const charByName = useMemo(() => {
     const m = new Map<string, CharStats>()
     for (const c of chars) m.set(c.name, c)
@@ -465,18 +479,9 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
     (group?.characters ?? []).filter((c) => c.has_stats).map((c) => c.name),
   )
 
-  // 그룹 전체 접속 복사 — 시작 스크립트 한 줄을 그대로 준다.
-  //
-  // ★예전에는 respawn-pane 을 창 수만큼 이어붙였다★ 그 방식은 이미 떠 있는 세션의
-  //   각 창을 하나씩 되살리는 것이라, 창 구성이 스크립트와 어긋나 있으면(창이 빠졌거나
-  //   이름이 다르면) 그 창만 조용히 안 살아났다. 시작 스크립트를 부르면 세션 구성이
-  //   스크립트 한 곳에서만 정의되므로 화면과 실제가 어긋날 여지가 없다.
-  //
-  // ★파일명이 세션명과 다른 예외가 하나 있다★ goblin 세션은 start_goblin.sh 가 아니라
-  //   start_tmux.sh 가 만든다(실측 2026-08-14). 나머지 5개는 start_{세션명}.sh 규칙.
-  const startScript =
-    group?.session === "goblin" ? "start_tmux.sh" : `start_${group?.session}.sh`
-  const groupCopyText = group ? `bash ~/projects/goblin/${startScript}` : ""
+  // 그룹 전체 동작 카드(GroupCard)에 넘길 정의. 시작 스크립트 이름 같은 건
+  // group-card.tsx 의 startScriptOf 가 알아서 고른다.
+  const groupDef = group ? groupDefBySession(group.session) : undefined
 
   return (
     <div className="tin-scroll min-h-0 flex-1 overflow-y-auto" style={{ padding: "var(--gap-sec)" }}>
@@ -536,8 +541,12 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
           </div>
         </div>
 
-        {/* 한방 접속 복사칸 — 그룹 헤더 바로 아래 */}
-        {group && order.length > 0 && <RespawnAllBox text={groupCopyText} />}
+        {/* 그룹 전체 동작 — 메인페이지와 똑같은 카드를 그대로 쓴다.
+            (예전에는 시작 스크립트 한 줄을 복사만 하는 칸이었다. 메인페이지에서
+             이미 되던 접속/끊기/뷰를 여기서도 바로 누를 수 있게 카드로 바꿨다.) */}
+        {group && order.length > 0 && groupDef && (
+          <GroupCard group={groupDef} onOpenFile={onOpenFile} />
+        )}
 
         {/* 자반 중지/실행 복사 카드 6개 — 한방 접속 복사칸 바로 아래, 그룹 무관 고정 */}
         <IgnoreControlsSection />
@@ -548,8 +557,8 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
           placeholder="그룹 메모"
         />
 
-        {/* 캐릭터 카드 2열 배치 (화면 표시 순서 — 천마신군그룹만 고정 순서, pane 번호는 아래서 별도 계산),
-            1000px 이하에서 1열로 전환 */}
+        {/* 캐릭터 카드 2열 배치 (화면 표시 순서 — 천마신군그룹만 고정 순서, 창번호는
+            paneByName 이 서버 index 로 따로 준다), 1000px 이하에서 1열로 전환 */}
         <div className="cc-card-grid">
           {order.length === 0 && !groupLoading && (
             <div className="cc-panel ty-sub">그룹 정보를 불러오지 못했습니다.</div>
@@ -557,7 +566,7 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
           {displayOrder(groupName, order).map((name) => (
             <CharCard
               key={name}
-              windowIndex={order.indexOf(name)}
+              windowIndex={paneByName.get(name) ?? order.indexOf(name)}
               session={group?.session ?? ""}
               name={name}
               groupName={groupName}
@@ -565,6 +574,7 @@ export function GroupDashboard({ groupName }: { groupName: string }) {
               stat={charByName.get(name)}
               stat30={char30ByName.get(name)}
               hasStats={statCharNames.has(name)}
+              onOpenFile={onOpenFile}
             />
           ))}
         </div>
@@ -787,7 +797,9 @@ function CharCard({
   stat,
   stat30,
   hasStats,
+  onOpenFile,
 }: {
+  /** 실제 tmux 창번호 — paneIndexMap 이 서버 index 에서 준 값 */
   windowIndex: number
   session: string
   name: string
@@ -796,6 +808,7 @@ function CharCard({
   stat: CharStats | undefined
   stat30: CharStats | undefined
   hasStats: boolean
+  onOpenFile: (name: string) => void
 }) {
   const pending = !stat || stat.pending
   const mana = hasMana(name)
@@ -909,8 +922,36 @@ function CharCard({
         </>
       )}
 
-      {/* 개별 접속 복사 — 통계 연동 여부와 무관하게 항상 보여준다(재접속은 상태 표시와 별개 기능) */}
-      <div style={{ marginTop: 10 }}>
+      {/* 개별 동작 — 통계 연동 여부와 무관하게 항상 보여준다(재접속은 상태 표시와 별개 기능).
+          창번호(windowIndex)는 서버가 tmux 에서 읽어온 실제 값이다. */}
+      <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <RunButton
+          label="접속"
+          icon={<PlugZap className="size-3.5" />}
+          group={name}
+          target={HOST_INTERNAL}
+          remote={connectCharCmd(session, groupName, name, windowIndex)}
+          needConfirm
+          confirmText={
+            `[${name}] 접속\n\n` +
+            `${session}:${windowIndex} 창만 끊고 다시 띄웁니다.\n` +
+            `같은 그룹의 다른 캐릭터는 건드리지 않습니다.\n\n계속할까요?`
+          }
+        />
+        <CopyButton text={`#read tin/${sourceTinRel(groupName, name)}`} label="#read 복사" />
+        <button
+          // 파일관리가 쓰는 경로는 "tin/" 접두사가 없다(group-card.tsx 와 같은 규칙).
+          onClick={() => onOpenFile(sourceTinRel(groupName, name))}
+          className="cc-btn"
+          title={`tin/${sourceTinRel(groupName, name)}`}
+        >
+          <Eye className="size-3.5" />
+          파일보기
+        </button>
+      </div>
+
+      {/* 손으로 붙여넣을 때 쓰는 완전재접 한 줄 */}
+      <div style={{ marginTop: 6 }}>
         <CopyButton
           text={respawnCmd(session, groupName, name, windowIndex)}
           label="접속 복사"

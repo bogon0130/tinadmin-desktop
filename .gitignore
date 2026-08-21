@@ -25,3 +25,8 @@ dist-ssr
 
 # Rust / Tauri build artifacts
 src-tauri/target
+
+# 작업 중 만드는 백업 파일 — 커밋하지 않는다 (CLAUDE.md 관례)
+# 형태가 제각각이라(.bak / .v48bak / .deadbak / .execbak2 ...) 넓게 잡는다.
+*bak
+*bak[0-9]

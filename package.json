@@ -1,14 +1,14 @@
 {
   "name": "tinadmin-desktop",
   "private": true,
-  "version": "0.50.0",
+  "version": "0.51.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b --force",
     "preview": "vite preview",
     "tauri": "tauri"
   },
