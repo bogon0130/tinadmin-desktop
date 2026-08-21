@@ -13,21 +13,15 @@ export const GROUPS: GroupDef[] = [
   {
     name: "한비광",
     session: "goblin",
-    files: [
-      { label: "기본", path: "tin/한비광그룹/한비광그룹기본.tin" },
-      // 이 카드의 "리더" 는 공용 리더.tin 이 아니라 리더 캐릭터 본인의 파일이다.
-      { label: "리더", path: "tin/한비광그룹/한비광.tin" },
-      // 졸일은 combo 가 없어 원본 직결이다(2026-08-21 쫄그룹에서 편입).
-      { label: "졸일", path: "tin/한비광그룹/졸일.tin" },
-    ],
+    // 파일 줄 없음 — 이 그룹은 대시보드 화면의 캐릭터별 카드에서 파일을 연다
+    // (2026-08-21: 기본/리더/졸일 3줄 제거).
+    files: [],
   },
   {
     name: "천마신군",
     session: "chunma",
-    files: [
-      { label: "기본", path: "tin/천마신군그룹/천마그룹기본.tin" },
-      { label: "리더", path: "tin/3_직업별_자반/리더.tin" },
-    ],
+    // 파일 줄 없음 — 한비광그룹과 같은 이유(2026-08-21: 기본/리더 2줄 제거).
+    files: [],
   },
   {
     name: "장군",

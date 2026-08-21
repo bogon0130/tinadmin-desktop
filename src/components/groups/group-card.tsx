@@ -229,7 +229,9 @@ export function GroupCard({
         />
       </div>
 
-      {/* tin 파일 줄 — 파일마다 한 줄 */}
+      {/* tin 파일 줄 — 파일마다 한 줄.
+          files 가 비면(한비광·천마신군) 구분선만 남아 빈 칸처럼 보이므로 통째로 숨긴다. */}
+      {group.files.length > 0 && (
       <div
         style={{
           display: "flex",
@@ -262,6 +264,7 @@ export function GroupCard({
           </div>
         ))}
       </div>
+      )}
     </article>
   )
 }
