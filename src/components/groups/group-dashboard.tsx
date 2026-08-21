@@ -938,7 +938,6 @@ function CharCard({
             `같은 그룹의 다른 캐릭터는 건드리지 않습니다.\n\n계속할까요?`
           }
         />
-        <CopyButton text={`#read tin/${sourceTinRel(groupName, name)}`} label="#read 복사" />
         <button
           // 파일관리가 쓰는 경로는 "tin/" 접두사가 없다(group-card.tsx 와 같은 규칙).
           onClick={() => onOpenFile(sourceTinRel(groupName, name))}

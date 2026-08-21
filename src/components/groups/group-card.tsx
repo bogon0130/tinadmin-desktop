@@ -1,9 +1,7 @@
 import { useState } from "react"
 import { invoke } from "@tauri-apps/api/core"
-import { Check, Copy, Eye, Loader2, Monitor, PlugZap, Unplug } from "lucide-react"
+import { Eye, Loader2, Monitor, PlugZap, Unplug } from "lucide-react"
 import { toast } from "sonner"
-
-import { copyText } from "@/lib/clipboard"
 
 /**
  * 그룹 카드 한 장을 그리는 공용 부품.
@@ -79,34 +77,6 @@ export function connectCmd(group: GroupDef): string {
     `tmux kill-session -t ${s} 2>/dev/null; ` +
     `bash ~/projects/goblin/${startScriptOf(group)}; ` +
     `tmux attach -t ${s}`
-  )
-}
-
-/**
- * #read 한 줄을 클립보드에 넣는 버튼.
- * 성공하면 1.2초 동안 라벨이 "복사됨" 으로 바뀐다(group-dashboard 와 같은 방식).
- */
-function ReadCopyButton({ path }: { path: string }) {
-  const [done, setDone] = useState(false)
-  const text = `#read ${path}`
-
-  return (
-    <button
-      onClick={async () => {
-        if (await copyText(text)) {
-          setDone(true)
-          setTimeout(() => setDone(false), 1200)
-          toast.success("복사됨", { description: text })
-        } else {
-          toast.error("복사하지 못했습니다")
-        }
-      }}
-      className="cc-btn"
-      title={text}
-    >
-      {done ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-      {done ? "복사됨" : "#read 복사"}
-    </button>
   )
 }
 
@@ -289,7 +259,6 @@ export function GroupCard({
               <Eye className="size-3.5" />
               보기
             </button>
-            <ReadCopyButton path={f.path} />
           </div>
         ))}
       </div>
