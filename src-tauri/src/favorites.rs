@@ -17,10 +17,6 @@ use tauri::Manager;
 const FILE_NAME: &str = "favorites.json";
 /// 양식 즐겨찾기 (편집 중인 tin 파일에 끼워 넣는 텍스트 목록)
 const SNIP_FILE_NAME: &str = "text_snippets.json";
-/// 캐릭터별 메모/할일
-const NOTE_FILE_NAME: &str = "char_notes.json";
-/// 그룹 전체 메모/할일 (캐릭터 메모와 별개 파일)
-const GROUP_NOTE_FILE_NAME: &str = "group_notes.json";
 
 fn store_path_named(app: &tauri::AppHandle, file: &str) -> Result<PathBuf, String> {
     let dir = app
@@ -74,30 +70,6 @@ pub fn textsnips_save(app: tauri::AppHandle, json: String) -> Result<String, Str
     save_json(&app, SNIP_FILE_NAME, json)
 }
 
-/// 캐릭터 메모 읽기 — 파일이 없으면 빈 문자열.
-#[tauri::command]
-pub fn charnotes_load(app: tauri::AppHandle) -> Result<String, String> {
-    load_json(&app, NOTE_FILE_NAME)
-}
-
-/// 캐릭터 메모 저장.
-#[tauri::command]
-pub fn charnotes_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
-    save_json(&app, NOTE_FILE_NAME, json)
-}
-
-/// 그룹 메모 읽기 — 파일이 없으면 빈 문자열.
-#[tauri::command]
-pub fn groupnotes_load(app: tauri::AppHandle) -> Result<String, String> {
-    load_json(&app, GROUP_NOTE_FILE_NAME)
-}
-
-/// 그룹 메모 저장.
-#[tauri::command]
-pub fn groupnotes_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
-    save_json(&app, GROUP_NOTE_FILE_NAME, json)
-}
-
 fn store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let dir = app
         .path()
@@ -105,12 +77,6 @@ fn store_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .map_err(|e| format!("설정 폴더를 찾지 못했습니다: {}", e))?;
     fs::create_dir_all(&dir).map_err(|e| format!("설정 폴더를 만들지 못했습니다: {}", e))?;
     Ok(dir.join(FILE_NAME))
-}
-
-/// 즐겨찾기 파일 위치 (화면에 보여주기 위함).
-#[tauri::command]
-pub fn favorites_path(app: tauri::AppHandle) -> Result<String, String> {
-    Ok(store_path(&app)?.to_string_lossy().to_string())
 }
 
 /// 저장된 JSON 을 그대로 돌려준다. 파일이 없으면 빈 문자열.
@@ -125,37 +91,4 @@ pub fn favorites_load(app: tauri::AppHandle) -> Result<String, String> {
         return Ok(String::new());
     }
     fs::read_to_string(&path).map_err(|e| format!("즐겨찾기를 읽지 못했습니다: {}", e))
-}
-
-/// JSON 을 저장한다. 저장 직전에 형식을 검사하고, 원자적으로 바꿔친다.
-#[tauri::command]
-pub fn favorites_save(app: tauri::AppHandle, json: String) -> Result<String, String> {
-    if json.len() > 4 * 1024 * 1024 {
-        return Err("즐겨찾기가 너무 큽니다.".into());
-    }
-    // 깨진 JSON 을 저장해서 다음 실행 때 목록을 통째로 잃는 일을 막는다.
-    serde_json::from_str::<serde_json::Value>(&json)
-        .map_err(|e| format!("즐겨찾기 형식이 올바르지 않아 저장하지 않았습니다: {}", e))?;
-
-    let path = store_path(&app)?;
-
-    // 손상 대비: 기존 파일을 .bak 으로 남긴다.
-    if path.is_file() {
-        let _ = fs::copy(&path, path.with_extension("json.bak"));
-    }
-
-    // 임시 파일에 다 쓴 뒤 이름을 바꾼다.
-    // 쓰는 도중에 앱이 죽어도 원본이 반쯤 잘린 상태로 남지 않는다.
-    let tmp = path.with_extension("json.tmp");
-    {
-        let mut f = fs::File::create(&tmp)
-            .map_err(|e| format!("즐겨찾기를 쓰지 못했습니다: {}", e))?;
-        f.write_all(json.as_bytes())
-            .map_err(|e| format!("즐겨찾기를 쓰지 못했습니다: {}", e))?;
-        f.sync_all().ok();
-    }
-    fs::rename(&tmp, &path).map_err(|e| format!("즐겨찾기를 저장하지 못했습니다: {}", e))?;
-
-    log::info!("즐겨찾기 저장: {} ({} bytes)", path.display(), json.len());
-    Ok(path.to_string_lossy().to_string())
 }

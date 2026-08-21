@@ -18,6 +18,7 @@ import {
   type MySnipStore,
 } from "@/lib/mysnips"
 import type { TableType } from "@/lib/types"
+import { copyText } from "@/lib/clipboard"
 
 /**
  * 사용법 — tin 문법과 예제를 한자리에 모아둔 화면.
@@ -56,28 +57,6 @@ function exampleOf(form: SnippetForm): string {
 }
 
 /** 클립보드 복사 — Tauri 웹뷰에서 clipboard API 가 막혀도 되도록 대비한다 */
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    // 구형 경로: 화면 밖 textarea 를 만들어 execCommand 로 복사
-    try {
-      const ta = document.createElement("textarea")
-      ta.value = text
-      ta.style.position = "fixed"
-      ta.style.left = "-9999px"
-      document.body.appendChild(ta)
-      ta.select()
-      const ok = document.execCommand("copy")
-      document.body.removeChild(ta)
-      return ok
-    } catch {
-      return false
-    }
-  }
-}
-
 /** 복사 버튼 — 누르면 잠깐 체크 표시로 바뀐다 */
 function CopyButton({ text, title }: { text: string; title?: string }) {
   const [done, setDone] = useState(false)

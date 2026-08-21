@@ -6,6 +6,7 @@ import { getStatsMe, type CharStats, type LevelEvent } from "@/lib/api"
 import { getGroups, type GroupInfo } from "@/lib/groups"
 import { EMPTY_STAT, getFavStat, type FavStat } from "@/lib/favstats"
 import { getNote, saveNote } from "@/lib/notes-store"
+import { copyText } from "@/lib/clipboard"
 
 /**
  * 그룹 캐릭터 5명의 stats_fav id.
@@ -117,28 +118,6 @@ function comboPath(groupName: string, charName: string): string {
  */
 function respawnCmd(session: string, groupName: string, name: string, pane: number): string {
   return `tmux respawn-pane -k -t ${session}:${pane} 'cd ~/projects/goblin && tt++ ${comboPath(groupName, name)}'`
-}
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    // Tauri 웹뷰에서 clipboard API 가 막히면 구형 경로로 시도한다
-    try {
-      const ta = document.createElement("textarea")
-      ta.value = text
-      ta.style.position = "fixed"
-      ta.style.left = "-9999px"
-      document.body.appendChild(ta)
-      ta.select()
-      const ok = document.execCommand("copy")
-      document.body.removeChild(ta)
-      return ok
-    } catch {
-      return false
-    }
-  }
 }
 
 function CopyButton({ text, label, full }: { text: string; label: string; full?: boolean }) {
