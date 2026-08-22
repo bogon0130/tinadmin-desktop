@@ -147,9 +147,20 @@ export function RunButton({
 export function GroupCard({
   group,
   onOpenFile,
+  filesLayout = "stack",
 }: {
   group: GroupDef
   onOpenFile: (name: string) => void
+  /**
+   * tin 파일 줄 배치.
+   *   "stack" — 파일마다 한 줄(라벨 + [보기]). 메인페이지·쫄그룹의 기존 모양이다.
+   *   "row"   — [{파일명} 보기] 버튼들을 가로 한 줄에 나열. 직업그룹 대시보드용.
+   *
+   * ★기본값이 "stack" 인 이유★ 이 카드는 메인페이지와 쫄그룹, 그리고 그룹
+   *   대시보드 상단이 함께 쓴다. 여기 직접 손대면 메인페이지까지 같이 바뀌므로,
+   *   새 모양은 prop 으로만 갈라서 호출부가 명시적으로 고르게 한다.
+   */
+  filesLayout?: "stack" | "row"
 }) {
   const s = group.session
   const connect = connectCmd(group)
@@ -232,38 +243,51 @@ export function GroupCard({
       {/* tin 파일 줄 — 파일마다 한 줄.
           files 가 비면(한비광·천마신군) 구분선만 남아 빈 칸처럼 보이므로 통째로 숨긴다. */}
       {group.files.length > 0 && (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 6,
-          marginTop: 12,
-          paddingTop: 10,
-          borderTop: "1px solid var(--border)",
-        }}
-      >
-        {group.files.map((f) => (
-          <div
-            key={f.path}
-            style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
-          >
-            <span className="ty-sub" style={{ minWidth: 78, flexShrink: 0 }} title={f.path}>
-              {f.label}
-            </span>
-            <button
-              // ★파일관리가 쓰는 경로는 "tin/" 접두사가 없다★ #read 는 프로젝트 루트
-              //   기준(tin/...)이고, /api/files 는 tin 폴더 기준(1_기본/기본.tin)이다.
-              //   여기서 떼어 넘기지 않으면 파일을 못 찾는다.
-              onClick={() => onOpenFile(f.path.replace(/^tin\//, ""))}
-              className="cc-btn"
-              title={f.path}
-            >
-              <Eye className="size-3.5" />
-              보기
-            </button>
-          </div>
-        ))}
-      </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: filesLayout === "row" ? "row" : "column",
+            flexWrap: filesLayout === "row" ? "wrap" : "nowrap",
+            gap: 6,
+            marginTop: 12,
+            paddingTop: 10,
+            borderTop: "1px solid var(--border)",
+          }}
+        >
+          {group.files.map((f) =>
+            // ★파일관리가 쓰는 경로는 "tin/" 접두사가 없다★ #read 는 프로젝트 루트
+            //   기준(tin/...)이고, /api/files 는 tin 폴더 기준(1_기본/기본.tin)이다.
+            //   여기서 떼어 넘기지 않으면 파일을 못 찾는다.
+            filesLayout === "row" ? (
+              <button
+                key={f.path}
+                onClick={() => onOpenFile(f.path.replace(/^tin\//, ""))}
+                className="cc-btn"
+                title={f.path}
+              >
+                <Eye className="size-3.5" />
+                {f.label} 보기
+              </button>
+            ) : (
+              <div
+                key={f.path}
+                style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}
+              >
+                <span className="ty-sub" style={{ minWidth: 78, flexShrink: 0 }} title={f.path}>
+                  {f.label}
+                </span>
+                <button
+                  onClick={() => onOpenFile(f.path.replace(/^tin\//, ""))}
+                  className="cc-btn"
+                  title={f.path}
+                >
+                  <Eye className="size-3.5" />
+                  보기
+                </button>
+              </div>
+            ),
+          )}
+        </div>
       )}
     </article>
   )

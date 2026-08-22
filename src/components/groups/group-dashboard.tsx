@@ -610,7 +610,13 @@ export function GroupDashboard({
             (예전에는 시작 스크립트 한 줄을 복사만 하는 칸이었다. 메인페이지에서
              이미 되던 접속/끊기/뷰를 여기서도 바로 누를 수 있게 카드로 바꿨다.) */}
         {group && order.length > 0 && groupDef && (
-          <GroupCard group={groupDef} onOpenFile={onOpenFile} />
+          <GroupCard
+            group={groupDef}
+            onOpenFile={onOpenFile}
+            // 직업그룹 4개만 파일 줄을 가로 한 줄로. 메인페이지는 기본값(stack)이라
+            // 이 prop 을 넘기지 않으므로 렌더 결과가 바뀌지 않는다.
+            filesLayout={JOB_GROUPS.has(groupName) ? "row" : "stack"}
+          />
         )}
 
         {/* 자반 중지/실행 복사 카드 6개 — 한방 접속 복사칸 바로 아래, 그룹 무관 고정 */}
@@ -875,10 +881,9 @@ function MaxStatsRow({ stat }: { stat: FavStat }) {
  *   대신 20명 전원이 즐겨찾기에 등록돼 있어 최대능력치(체력/마력/이동)를
  *   `/api/favstats/{id}` 로 받을 수 있다 — 그래서 그쪽 모양을 따른다.
  *
- * ★favId 가 메모 key 도 겸한다★
- *   메모 key 는 서버가 `[a-zA-Z0-9_-]+` 만 받는다(features/notes.py KEY_RE).
- *   한글 이름을 그대로 쓰면 저장이 안 된다. 즐겨찾기 id 는 영숫자라 그대로
- *   쓸 수 있고, 리더 5명이 stat id 를 메모 key 로 재사용하는 것과 같은 방식이다.
+ * ★메모칸이 없다★ 리더 2그룹 카드에는 있지만 이 카드에는 일부러 두지 않았다
+ *   (2026-08-22). 카드를 작게 유지하는 게 목적이고, 메모가 필요하면 즐겨찾기
+ *   화면에서 같은 캐릭터에 달 수 있다. 다른 화면의 메모 기능은 그대로다.
  */
 function JobCharCard({
   windowIndex,
@@ -924,7 +929,7 @@ function JobCharCard({
       </div>
 
       {/* 최대 능력치 — 게임에서 "점수"를 쳐야 값이 생긴다. 없으면 "-" */}
-      <div className="cc-stats" style={{ marginBottom: 10 }}>
+      <div className="cc-stats" style={{ marginBottom: 0 }}>
         <span>
           체력 <b>{fmt(stat.hpMax)}</b>
         </span>
@@ -936,17 +941,8 @@ function JobCharCard({
         </span>
       </div>
 
-      <div className="cc-meta">
-        <div className="cc-meta-item">
-          <span className="cc-meta-k">SESSION</span>
-          <span className="cc-meta-v">
-            {session}:{windowIndex}
-          </span>
-        </div>
-      </div>
-
       {/* 창번호는 서버가 tmux 에서 읽어온 실제 값이다 */}
-      <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+      <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
         <RunButton
           label="접속"
           icon={<PlugZap className="size-3.5" />}
@@ -969,12 +965,6 @@ function JobCharCard({
           파일보기
         </button>
       </div>
-
-      {favId && (
-        <div style={{ marginTop: 8 }}>
-          <NoteBox noteKey={favId} placeholder="메모" />
-        </div>
-      )}
     </article>
   )
 }
