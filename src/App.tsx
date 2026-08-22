@@ -56,12 +56,22 @@ type ViewId =
   | "items"
   | "doc-한비광그룹"
   | "doc-천마신군그룹"
+  | "doc-장군그룹"
+  | "doc-대부그룹"
+  | "doc-교황그룹"
+  | "doc-마왕그룹"
   | "jjol"
 
 /** 그룹 대시보드 메뉴 id -> 그룹명 */
 const GROUP_VIEWS: Record<string, string> = {
   "doc-한비광그룹": "한비광그룹",
   "doc-천마신군그룹": "천마신군그룹",
+  // 직업그룹 4개(2026-08-22 추가). 값은 config.py GROUPS 의 키 그대로여야 한다 —
+  // 리더 2그룹은 "…그룹" 으로 끝나지만 이 4개는 "장군"·"대부" 처럼 접미사가 없다.
+  "doc-장군그룹": "장군",
+  "doc-대부그룹": "대부",
+  "doc-교황그룹": "교황",
+  "doc-마왕그룹": "마왕",
 }
 // ★쫄그룹("jjol")은 여기 넣지 않는다★ GROUP_VIEWS 는 /api/groups 로 세션 하나의
 //   창 상태를 그리는 GroupDashboard 로 이어지는데, 쫄은 캐릭터마다 세션이 따로라
@@ -80,6 +90,10 @@ const MENU: MenuItem[] = [
   // 그룹별 대시보드
   { id: "doc-한비광그룹", label: "한비광그룹", icon: BookOpen },
   { id: "doc-천마신군그룹", label: "천마신군그룹", icon: BookOpen },
+  { id: "doc-장군그룹", label: "장군그룹", icon: BookOpen },
+  { id: "doc-대부그룹", label: "대부그룹", icon: BookOpen },
+  { id: "doc-교황그룹", label: "교황그룹", icon: BookOpen },
+  { id: "doc-마왕그룹", label: "마왕그룹", icon: BookOpen },
   // 쫄 6캐릭은 항목 하나로 묶는다 — 클릭하면 전용 화면에 카드 6장이 뜬다.
   // (처음엔 "└ 졸일"~"└ 졸육" 6줄로 늘어놨는데 메뉴가 밀려서 2026-08-15 통합)
   { id: "jjol", label: "쫄그룹", icon: Users },

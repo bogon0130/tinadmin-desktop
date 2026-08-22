@@ -3,6 +3,7 @@ import { Check, Copy, Eye, Loader2, PlugZap, RefreshCw, Server } from "lucide-re
 import { toast } from "sonner"
 
 import { getStatsMe, type CharStats, type LevelEvent } from "@/lib/api"
+import { loadFavorites } from "@/lib/favorites"
 import { getGroups, type GroupInfo } from "@/lib/groups"
 import { EMPTY_STAT, getFavStat, type FavStat } from "@/lib/favstats"
 import { getNote, saveNote } from "@/lib/notes-store"
@@ -48,7 +49,26 @@ const NOTE_KEY: Record<string, string> = {
 const GROUP_SLUG: Record<string, string> = {
   한비광그룹: "hanbigwang",
   천마신군그룹: "cheonmasingun",
+  // 직업그룹 4개(2026-08-22 추가) — 메모 key 는 [a-zA-Z0-9_-] 만 허용하므로
+  // 한글 그룹명을 그대로 쓸 수 없다. 세션명을 슬러그로 재사용한다.
+  장군: "janggun",
+  대부: "daebu",
+  교황: "gyohwang",
+  마왕: "mawang",
 }
+
+/**
+ * 직업그룹 4개 — 리더 2그룹과 파일 배치·카드 구성이 다르다.
+ *
+ * | 항목 | 리더 2그룹 | 직업그룹 4개 |
+ * |---|---|---|
+ * | 조합 파일 | `{그룹}/combo/{이름}.tin` | `_combos/{이름}.tin` |
+ * | 원본 tin | `{그룹}/{이름}.tin` (천마는 접두사) | `2_{그룹}/{이름}.tin` |
+ * | 카드 | 레벨업 통계(stats.log) | 즐겨찾기 최대능력치(체력/마력/이동) |
+ *
+ * 20명 전부 combo 가 실제로 #read 하는 대상과 대조해 확인했다(2026-08-22).
+ */
+const JOB_GROUPS = new Set(["장군", "대부", "교황", "마왕"])
 
 /**
  * 그룹 대시보드 — 24시간 자동사냥 그룹(한비광그룹/천마신군그룹) 실시간 현황.
@@ -109,6 +129,8 @@ function hasMana(name: string): boolean {
  * 이전의 옛 파일명(FILE_TARGETS 키)을 그대로 돌려줘서 지금은 낡아있다.
  */
 function comboPath(groupName: string, charName: string): string {
+  // 직업그룹 4개는 그룹 폴더가 없고 조합이 전부 tin/_combos/ 한곳에 모여 있다.
+  if (JOB_GROUPS.has(groupName)) return `tin/_combos/${charName}.tin`
   return `tin/${groupName}/combo/${charName}.tin`
 }
 
@@ -161,6 +183,8 @@ const SOURCE_TIN: Record<string, string> = {
 
 /** 파일관리 화면이 쓰는 경로(tin/ 접두사 없음). */
 function sourceTinRel(groupName: string, name: string): string {
+  // 직업그룹 4개는 원본이 2_{그룹}/ 아래에 있다 (2_장군/담신우.tin 처럼).
+  if (JOB_GROUPS.has(groupName)) return `2_${groupName}/${name}.tin`
   return SOURCE_TIN[name] ?? `${groupName}/${name}.tin`
 }
 
@@ -354,11 +378,13 @@ function daysAgoStr(n: number) {
 /**
  * 세션이 꺼져 있을 때 쓰는 대체 순서 — config.py GROUPS 등록 순서.
  *
- * "복병"은 한비광그룹에 등록돼 있지만 실제로는 daebu 세션에서 뜬다.
- * goblin 세션의 창번호와 무관하므로 항상 제외한다.
+ * 예전에는 여기서 "복병"을 걸러냈다. 한비광그룹에 등록돼 있는데 실제로는
+ * daebu 세션에서 뜨는 캐릭터였기 때문이다. 2026-08-22 에 config.py 를
+ * 실측대로 고쳐(복병을 대부 windows 의 1번 자리로 옮김) 더 이상 걸러낼
+ * 이름이 없다 — 이제 등록 순서가 곧 실제 창번호 순서다.
  */
 function configOrder(g: GroupInfo): string[] {
-  return g.windows.filter((w) => w !== "복병")
+  return g.windows
 }
 
 /** 카드에 보여줄 순서 — 살아있으면 실제 tmux 창 순서, 죽어있으면 설정 순서. */
@@ -499,6 +525,27 @@ export function GroupDashboard({
 
   // 그룹 전체 동작 카드(GroupCard)에 넘길 정의. 시작 스크립트 이름 같은 건
   // group-card.tsx 의 startScriptOf 가 알아서 고른다.
+  // 즐겨찾기 이름 → id. 직업그룹 카드가 최대능력치·메모 key 로 쓴다.
+  // 이름을 하드코딩하지 않으려고 서버 목록에서 그때그때 만든다.
+  const [favIdByName, setFavIdByName] = useState<Map<string, string>>(new Map())
+  useEffect(() => {
+    if (!JOB_GROUPS.has(groupName)) return
+    let alive = true
+    void loadFavorites()
+      .then(({ store }) => {
+        if (!alive) return
+        const m = new Map<string, string>()
+        for (const it of store.items) if (it.name) m.set(it.name, it.id)
+        setFavIdByName(m)
+      })
+      .catch(() => {
+        /* 즐겨찾기를 못 읽어도 카드는 떠야 한다 — 스탯칸만 "-" 로 남는다 */
+      })
+    return () => {
+      alive = false
+    }
+  }, [groupName])
+
   const groupDef = group ? groupDefBySession(group.session) : undefined
 
   return (
@@ -581,20 +628,33 @@ export function GroupDashboard({
           {order.length === 0 && !groupLoading && (
             <div className="cc-panel ty-sub">그룹 정보를 불러오지 못했습니다.</div>
           )}
-          {displayOrder(groupName, order).map((name) => (
-            <CharCard
-              key={name}
-              windowIndex={paneByName.get(name) ?? order.indexOf(name)}
-              session={group?.session ?? ""}
-              name={name}
-              groupName={groupName}
-              live={liveByName.get(name) ?? false}
-              stat={charByName.get(name)}
-              stat30={char30ByName.get(name)}
-              hasStats={statCharNames.has(name)}
-              onOpenFile={onOpenFile}
-            />
-          ))}
+          {displayOrder(groupName, order).map((name) =>
+            JOB_GROUPS.has(groupName) ? (
+              <JobCharCard
+                key={name}
+                windowIndex={paneByName.get(name) ?? order.indexOf(name)}
+                session={group?.session ?? ""}
+                name={name}
+                groupName={groupName}
+                live={liveByName.get(name) ?? false}
+                favId={favIdByName.get(name)}
+                onOpenFile={onOpenFile}
+              />
+            ) : (
+              <CharCard
+                key={name}
+                windowIndex={paneByName.get(name) ?? order.indexOf(name)}
+                session={group?.session ?? ""}
+                name={name}
+                groupName={groupName}
+                live={liveByName.get(name) ?? false}
+                stat={charByName.get(name)}
+                stat30={char30ByName.get(name)}
+                hasStats={statCharNames.has(name)}
+                onOpenFile={onOpenFile}
+              />
+            ),
+          )}
         </div>
       </div>
     </div>
@@ -803,6 +863,119 @@ function MaxStatsRow({ stat }: { stat: FavStat }) {
         최대 이동력 <b>{fmt(stat.mvMax)}</b>
       </span>
     </div>
+  )
+}
+
+/**
+ * 직업그룹 캐릭터 카드 — 즐겨찾기(FavCommandCenter) 카드와 같은 모양.
+ *
+ * ★리더 2그룹과 왜 다른 카드인가★
+ *   한비광·천마신군 캐릭터는 tin 자반이 레벨업을 stats.log 에 찍어줘서
+ *   "며칠간 몇 번 올랐나" 를 보여줄 수 있다. 직업그룹 20명에는 그 자반이 없다.
+ *   대신 20명 전원이 즐겨찾기에 등록돼 있어 최대능력치(체력/마력/이동)를
+ *   `/api/favstats/{id}` 로 받을 수 있다 — 그래서 그쪽 모양을 따른다.
+ *
+ * ★favId 가 메모 key 도 겸한다★
+ *   메모 key 는 서버가 `[a-zA-Z0-9_-]+` 만 받는다(features/notes.py KEY_RE).
+ *   한글 이름을 그대로 쓰면 저장이 안 된다. 즐겨찾기 id 는 영숫자라 그대로
+ *   쓸 수 있고, 리더 5명이 stat id 를 메모 key 로 재사용하는 것과 같은 방식이다.
+ */
+function JobCharCard({
+  windowIndex,
+  session,
+  name,
+  groupName,
+  live,
+  favId,
+  onOpenFile,
+}: {
+  /** 실제 tmux 창번호 — paneIndexMap 이 서버 index 에서 준 값 */
+  windowIndex: number
+  session: string
+  name: string
+  groupName: string
+  live: boolean
+  /** 즐겨찾기 id. 없으면 스탯·메모칸을 숨긴다(등록 안 된 캐릭터). */
+  favId: string | undefined
+  onOpenFile: (name: string) => void
+}) {
+  const [stat, setStat] = useState<FavStat>(EMPTY_STAT)
+
+  useEffect(() => {
+    if (!favId) return
+    let alive = true
+    void getFavStat(favId).then((v) => {
+      if (alive) setStat(v)
+    })
+    return () => {
+      alive = false
+    }
+  }, [favId])
+
+  const fmt = (v: number | null) => (v === null ? "-" : v.toLocaleString())
+  const rel = sourceTinRel(groupName, name)
+
+  return (
+    <article className="cc-card">
+      <div className="cc-head">
+        <span className={live ? "cc-dot on" : "cc-dot"} />
+        <span className="cc-name">{name}</span>
+        <span className="cc-job">{groupName}</span>
+      </div>
+
+      {/* 최대 능력치 — 게임에서 "점수"를 쳐야 값이 생긴다. 없으면 "-" */}
+      <div className="cc-stats" style={{ marginBottom: 10 }}>
+        <span>
+          체력 <b>{fmt(stat.hpMax)}</b>
+        </span>
+        <span>
+          마력 <b>{fmt(stat.mpMax)}</b>
+        </span>
+        <span>
+          이동 <b>{fmt(stat.mvMax)}</b>
+        </span>
+      </div>
+
+      <div className="cc-meta">
+        <div className="cc-meta-item">
+          <span className="cc-meta-k">SESSION</span>
+          <span className="cc-meta-v">
+            {session}:{windowIndex}
+          </span>
+        </div>
+      </div>
+
+      {/* 창번호는 서버가 tmux 에서 읽어온 실제 값이다 */}
+      <div style={{ marginTop: 10, display: "flex", flexWrap: "wrap", gap: 6 }}>
+        <RunButton
+          label="접속"
+          icon={<PlugZap className="size-3.5" />}
+          group={name}
+          target={HOST_INTERNAL}
+          remote={connectCharCmd(session, groupName, name, windowIndex)}
+          needConfirm
+          confirmText={
+            `[${name}] 접속\n\n` +
+            `${session}:${windowIndex} 창만 끊고 다시 띄웁니다.\n` +
+            `같은 그룹의 다른 캐릭터는 건드리지 않습니다.\n\n계속할까요?`
+          }
+        />
+        <button
+          onClick={() => onOpenFile(rel)}
+          className="cc-btn"
+          title={`tin/${rel}`}
+        >
+          <Eye className="size-3.5" />
+          파일보기
+        </button>
+      </div>
+
+      {favId && (
+        <div style={{ marginTop: 8 }}>
+          <NoteBox noteKey={favId} placeholder="메모" />
+        </div>
+      )}
+    </article>
   )
 }
 
