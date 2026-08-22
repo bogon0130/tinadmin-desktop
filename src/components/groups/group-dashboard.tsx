@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { Check, Copy, Eye, Loader2, PlugZap, RefreshCw, Server } from "lucide-react"
+import { Check, Copy, Crown, Eye, Loader2, PlugZap, RefreshCw, Server } from "lucide-react"
 import { toast } from "sonner"
 
 import { getStatsMe, type CharStats, type LevelEvent } from "@/lib/api"
 import { loadFavorites } from "@/lib/favorites"
+import { getLeader, LEADER_GROUPS, setLeader, EMPTY_LEADER, type LeaderInfo } from "@/lib/leader"
 import { getGroups, type GroupInfo } from "@/lib/groups"
 import { EMPTY_STAT, getFavStat, type FavStat } from "@/lib/favstats"
 import { getNote, saveNote } from "@/lib/notes-store"
@@ -546,6 +547,46 @@ export function GroupDashboard({
     }
   }, [groupName])
 
+  // 현재 리더 — 장군·대부만. 서버가 원본 tin 을 훑어서 알려준다(별도 저장소 없음).
+  const canLeader = LEADER_GROUPS.has(groupName)
+  const [leaderInfo, setLeaderInfo] = useState<LeaderInfo>(EMPTY_LEADER)
+  const loadLeader = useCallback(async () => {
+    if (!canLeader) return
+    setLeaderInfo(await getLeader(groupName))
+  }, [canLeader, groupName])
+  useEffect(() => {
+    void loadLeader()
+  }, [loadLeader])
+
+  const changeLeader = useCallback(
+    async (name: string) => {
+      const prev = leaderInfo.leader
+      const msg =
+        prev && prev !== name
+          ? `리더를 ${prev} → ${name} 로 옮깁니다.\n\n` +
+            `파일만 바뀌고 재시작은 하지 않습니다.\n` +
+            `실제 반영은 두 캐릭터를 다시 띄울 때 이뤄집니다.\n\n계속할까요?`
+          : `리더를 ${name} 로 지정합니다.\n\n` +
+            `파일만 바뀌고 재시작은 하지 않습니다.\n` +
+            `실제 반영은 ${name} 를 다시 띄울 때 이뤄집니다.\n\n계속할까요?`
+      if (!window.confirm(msg)) return
+      try {
+        const r = await setLeader(groupName, name)
+        setLeaderInfo({ leader: r.leader, holders: [r.leader] })
+        toast.success(`👑 리더: ${r.leader}`, {
+          description: r.previous && r.previous !== r.leader
+            ? `${r.previous} 에게서 옮겼습니다. 반영하려면 재접속하세요.`
+            : "반영하려면 재접속하세요.",
+        })
+      } catch (e) {
+        toast.error("리더를 바꾸지 못했습니다", {
+          description: e instanceof Error ? e.message : String(e),
+        })
+      }
+    },
+    [groupName, leaderInfo.leader],
+  )
+
   const groupDef = group ? groupDefBySession(group.session) : undefined
 
   return (
@@ -619,6 +660,29 @@ export function GroupDashboard({
           />
         )}
 
+        {/* 현재 리더 — 장군·대부만. 값은 원본 tin 에서 바로 읽으므로 화면과 파일이
+            어긋날 수 없다. 리더가 둘 이상이면 비정상이라 그대로 드러낸다. */}
+        {canLeader && (
+          <div className="cc-panel">
+            <div className="ui-row" style={{ flexWrap: "wrap", gap: "var(--gap)" }}>
+              <Crown className="size-4" style={{ color: "var(--accent)" }} />
+              <span className="ty-sub">현재 리더</span>
+              <span className="ty-h" style={{ fontFamily: "var(--font-display)" }}>
+                {leaderInfo.leader ?? "리더 미지정"}
+              </span>
+              {leaderInfo.holders.length > 1 && (
+                <span className="ty-sub" style={{ color: "var(--danger, #e66)" }}>
+                  ⚠️ 리더가 {leaderInfo.holders.length}명입니다 ({leaderInfo.holders.join(", ")})
+                  — 아무 카드의 [리더] 를 누르면 한 명으로 정리됩니다
+                </span>
+              )}
+              <span className="ty-sub" style={{ marginLeft: "auto" }}>
+                파일만 바뀝니다 — 반영하려면 재접속하세요
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* 자반 중지/실행 복사 카드 6개 — 한방 접속 복사칸 바로 아래, 그룹 무관 고정 */}
         <IgnoreControlsSection />
 
@@ -645,6 +709,8 @@ export function GroupDashboard({
                 live={liveByName.get(name) ?? false}
                 favId={favIdByName.get(name)}
                 onOpenFile={onOpenFile}
+                isLeader={leaderInfo.leader === name}
+                onSetLeader={canLeader ? () => void changeLeader(name) : undefined}
               />
             ) : (
               <CharCard
@@ -893,6 +959,8 @@ function JobCharCard({
   live,
   favId,
   onOpenFile,
+  isLeader,
+  onSetLeader,
 }: {
   /** 실제 tmux 창번호 — paneIndexMap 이 서버 index 에서 준 값 */
   windowIndex: number
@@ -900,9 +968,13 @@ function JobCharCard({
   name: string
   groupName: string
   live: boolean
-  /** 즐겨찾기 id. 없으면 스탯·메모칸을 숨긴다(등록 안 된 캐릭터). */
+  /** 즐겨찾기 id. 없으면 스탯을 "-" 로 둔다(등록 안 된 캐릭터). */
   favId: string | undefined
   onOpenFile: (name: string) => void
+  /** 이 캐릭터가 지금 그룹의 리더인가 */
+  isLeader: boolean
+  /** 리더를 둘 수 있는 그룹(장군·대부)에서만 넘어온다. 없으면 버튼을 안 그린다. */
+  onSetLeader?: () => void
 }) {
   const [stat, setStat] = useState<FavStat>(EMPTY_STAT)
 
@@ -925,6 +997,7 @@ function JobCharCard({
       <div className="cc-head">
         <span className={live ? "cc-dot on" : "cc-dot"} />
         <span className="cc-name">{name}</span>
+        {isLeader && <span className="cc-job">리더</span>}
         <span className="cc-job">{groupName}</span>
       </div>
 
@@ -964,6 +1037,21 @@ function JobCharCard({
           <Eye className="size-3.5" />
           파일보기
         </button>
+        {onSetLeader && (
+          <button
+            onClick={onSetLeader}
+            disabled={isLeader}
+            className="cc-btn"
+            title={
+              isLeader
+                ? "이미 이 그룹의 리더입니다"
+                : `리더 자반(3_직업별_자반/리더.tin)을 ${name} 에게 옮깁니다`
+            }
+          >
+            <Crown className="size-3.5" />
+            리더
+          </button>
+        )}
       </div>
     </article>
   )
